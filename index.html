@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <!-- Optimized for iPad and mobile touch -->
@@ -16,12 +17,14 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        body, html {
+        body,
+        html {
             width: 100%;
             height: 100%;
             background-color: #111;
             overflow: hidden;
-            touch-action: none; /* Prevent iPad scrolling */
+            touch-action: none;
+            /* Prevent iPad scrolling */
         }
 
         canvas {
@@ -29,7 +32,7 @@
             width: 100%;
             height: 100%;
             /* Keeps 16x16 pixel art crisp */
-            image-rendering: pixelated; 
+            image-rendering: pixelated;
         }
 
         /* UI Overlay */
@@ -59,7 +62,7 @@
             border: 4px solid #888;
             border-radius: 8px;
             cursor: pointer;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
             /* Background image setup for when you add your textures */
             background-size: 100% 100%;
             background-position: center;
@@ -68,6 +71,10 @@
 
         .btn:active {
             transform: scale(0.95);
+        }
+
+        #startBtn {
+            background-image: url('textures/btn_start.png');
         }
 
         #title {
@@ -83,10 +90,11 @@
         }
     </style>
 </head>
+
 <body>
 
     <canvas id="gameCanvas"></canvas>
-    
+
     <div id="ui">
         <h1 id="title">The Rock Bottom</h1>
         <!-- In the future you can set CSS: background-image: url('textures/btn_start.png') -->
@@ -173,11 +181,13 @@
 
         // We draw the level to these offscreen canvases once
         const bgCanvas = document.createElement('canvas');
-        const collisionCanvas = document.createElement('canvas');
-        bgCanvas.width = collisionCanvas.width = World.width;
-        bgCanvas.height = collisionCanvas.height = World.height;
-        const bgCtx = bgCanvas.getContext('2d');
-        const colCtx = collisionCanvas.getContext('2d');
+        const collisionCanvas = document.createElement('canvas');
+        bgCanvas.width = collisionCanvas.width = World.width;
+        bgCanvas.height = collisionCanvas.height = World.height;
+        const bgCtx = bgCanvas.getContext('2d');
+        const colCtx = collisionCanvas.getContext('2d');
+        bgCtx.imageSmoothingEnabled = false;
+        colCtx.imageSmoothingEnabled = false;
 
         function drawRotatedImage(context, img, x, y, scale, rotation) {
             if (!img.complete || img.naturalWidth === 0) return;
@@ -458,4 +468,5 @@
         requestAnimationFrame(loop);
     </script>
 </body>
+
 </html>
