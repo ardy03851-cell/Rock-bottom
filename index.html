@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- Optimized for iPad and mobile touch -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Rock Bottom</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            /* Disable text selection and mobile tap highlights */
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            background-color: #111;
+            overflow: hidden;
+            touch-action: none; /* Prevent iPad scrolling */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            /* Keeps 16x16 pixel art crisp */
+            image-rendering: pixelated; 
+        }
+
+        /* UI Overlay */
+        #ui {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Standard buttons ready for custom textures */
+        .btn {
+            pointer-events: auto;
+            padding: 15px 30px;
+            margin: 10px;
+            font-size: 24px;
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            color: white;
+            background-color: #444;
+            border: 4px solid #888;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            /* Background image setup for when you add your textures */
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        #title {
+            font-family: 'Courier New', Courier, monospace;
+            color: white;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    
+    <div id="ui">
+        <h1 id="title">The Rock Bottom</h1>
+        <!-- In the future you can set CSS: background-image: url('textures/btn_start.png') -->
+        <button id="startBtn" class="btn">START GAME</button>
+        <button id="restartBtn" class="btn hidden">RESTART</button>
+    </div>
+
+    <script>
+        // --- Game Setup & Canvas ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const ui = document.getElementById('ui');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        const title = document.getElementById('title');
+
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            ctx.imageSmoothingEnabled = false; // Keep pixel art sharp
+        });
+
+        // --- Asset Management ---
+        const assets = {
+            player: new Image(),
+            hook: new Image(),
+            wall: new Image(),
+            bg_layer1: new Image(),
+            bg_layer2: new Image()
+        };
+
+        // Fallback generator if images aren't in the textures/ folder yet
+        function createFallback(color, isRound = false) {
+            let c = document.createElement('canvas');
+            c.width = 16; c.height = 16;
+            let cx = c.getContext('2d');
+            cx.fillStyle = color;
+            if(isRound) {
+                cx.beginPath();
+                cx.arc(8, 8, 8, 0, Math.PI*2);
+                cx.fill();
+            } else {
+                cx.fillRect(0,0,16,16);
+                cx.fillStyle = 'rgba(0,0,0,0.3)';
+                cx.fillRect(4,4,8,8);
+            }
+            return c;
+        }
+
+        // Attempt to load images, apply fallbacks if they fail
+        const textureFiles = {
+            player: 'textures/player.png',
+            hook: 'textures/hook.png',
+            wall: 'textures/wall.png',
+            bg_layer1: 'textures/bg_layer1.png',
+            bg_layer2: 'textures/bg_layer2.png'
+        };
+
+        const fallbacks = {
+            player: createFallback('#00ffcc', true).toDataURL(),
+            hook: createFallback('#ff3366', true).toDataURL(),
+            wall: createFallback('#665555').toDataURL(),
+            bg_layer1: createFallback('#1a1a24').toDataURL(),
+            bg_layer2: createFallback('#2a2a35').toDataURL()
+        };
+
+        for (let key in assets) {
+            assets[key].src = textureFiles[key];
+            assets[key].onerror = () => {
+                console.warn(`Could not load ${textureFiles[key]}, using fallback.`);
+                assets[key].src = fallbacks[key];
+            };
+        }
+
+        // --- World & Collision Setup ---
+        const World = {
+            width: 4000,
+            height: 2000,
+            collisionData: null, // Will hold the pixel array
+        };
+
+        // We draw the level to these offscreen canvases once
+        const bgCanvas = document.createElement('canvas');
+        const collisionCanvas = document.createElement('canvas');
+        bgCanvas.width = collisionCanvas.width = World.width;
+        bgCanvas.height = collisionCanvas.height = World.height;
+        const bgCtx = bgCanvas.getContext('2d');
+        const colCtx = collisionCanvas.getContext('2d');
+
+        function drawRotatedImage(context, img, x, y, scale, rotation) {
+            if (!img.complete || img.naturalWidth === 0) return;
+            context.save();
+            context.translate(x, y);
+            context.rotate(rotation * Math.PI / 180);
+            context.scale(scale, scale);
+            // Draw centered
+            context.drawImage(img, -img.width / 2, -img.height / 2);
+            context.restore();
+        }
+
+        function generateLevel() {
+            bgCtx.clearRect(0, 0, World.width, World.height);
+            colCtx.clearRect(0, 0, World.width, World.height);
+
+            // 1. Generate Deep Background (Layer 1 - parallaxed later, drawn huge here)
+            for(let i=0; i<300; i++) {
+                drawRotatedImage(bgCtx, assets.bg_layer1, Math.random() * World.width, Math.random() * World.height, Math.random() * 8 + 4, Math.random() * 360);
+            }
+
+            // 2. Generate Midground (Layer 2)
+            for(let i=0; i<200; i++) {
+                drawRotatedImage(bgCtx, assets.bg_layer2, Math.random() * World.width, Math.random() * World.height, Math.random() * 6 + 2, Math.random() * 360);
+            }
+
+            // 3. Generate Foreground / Collisions using Wall PNGs
+            // Floor & Ceiling Cave Generation
+            for(let x=0; x<World.width; x+= 100) {
+                // Ceiling
+                drawRotatedImage(colCtx, assets.wall, x, Math.random() * 150 + 50, Math.random() * 8 + 4, Math.random() * 360);
+                // Floor
+                drawRotatedImage(colCtx, assets.wall, x, World.height - (Math.random() * 200 + 100), Math.random() * 10 + 5, Math.random() * 360);
+            }
+
+            // Scattered Floating Rocks / Obstacles
+            for(let i=0; i<150; i++) {
+                drawRotatedImage(colCtx, assets.wall, Math.random() * World.width, Math.random() * (World.height - 600) + 300, Math.random() * 6 + 2, Math.random() * 360);
+            }
+
+            // Cache the collision pixel data to memory for ULTRA FAST per-pixel detection!
+            try {
+                const imgData = colCtx.getImageData(0, 0, World.width, World.height);
+                World.collisionData = imgData.data;
+            } catch (e) {
+                console.error("CORS error getting pixel data. Run on a local web server!", e);
+            }
+        }
+
+        // Check if a specific (x,y) pixel is visible (alpha > 0) in the PNG colliders
+        function isSolid(x, y) {
+            x = Math.floor(x);
+            y = Math.floor(y);
+            if (x < 0 || x >= World.width || y < 0 || y >= World.height) return true; // Bounds are solid
+            if (!World.collisionData) return false;
+            
+            // Index in 1D Uint8Array for (x,y). Array is [R,G,B,A, R,G,B,A...]
+            const alphaIndex = (y * World.width + x) * 4 + 3;
+            return World.collisionData[alphaIndex] > 10; // If mostly opaque, it's solid!
+        }
+
+        // Push objects out of solid pixels
+        function resolveCollision(entity) {
+            if (!isSolid(entity.x, entity.y)) return false;
+
+            // Search in an expanding circle for the nearest empty pixel
+            for (let r = 1; r < 30; r+=2) {
+                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+                    let cx = entity.x + Math.cos(angle) * r;
+                    let cy = entity.y + Math.sin(angle) * r;
+                    if (!isSolid(cx, cy)) {
+                        entity.x = cx;
+                        entity.y = cy;
+                        entity.vx *= 0.5; // Dampen speed on wall hit
+                        entity.vy *= 0.5;
+                        return true;
+                    }
+                }
+            }
+            return true;
+        }
+
+        // --- Game Entities ---
+        let camera = { x: 0, y: 0 };
+        
+        let player = {
+            x: 200, y: World.height / 2,
+            vx: 0, vy: 0,
+            radius: 8
+        };
+
+        let hook = {
+            active: false,
+            attached: false,
+            x: 0, y: 0,
+            vx: 0, vy: 0,
+            speed: 30
+        };
+
+        let gameState = 'menu'; // menu, playing, gameover
+
+        // --- Core Physics & Logic ---
+        function update() {
+            if (gameState !== 'playing') return;
+
+            // 1. Hook Logic
+            if (hook.active) {
+                if (!hook.attached) {
+                    // Fly forward
+                    hook.x += hook.vx;
+                    hook.y += hook.vy;
+                    // Check hit
+                    if (isSolid(hook.x, hook.y)) {
+                        hook.attached = true;
+                    }
+                } else {
+                    // Pull Player towards hook (Sling mechanic!)
+                    let dx = hook.x - player.x;
+                    let dy = hook.y - player.y;
+                    let dist = Math.hypot(dx, dy);
+                    
+                    if (dist > 10) {
+                        let pullForce = 0.4; // How fast you sling forward
+                        player.vx += (dx / dist) * pullForce;
+                        player.vy += (dy / dist) * pullForce;
+                    }
+                }
+            }
+
+            // 2. Player Physics
+            player.vy += 0.25; // Gravity
+            player.vx *= 0.98; // Air friction
+            player.vy *= 0.98;
+
+            player.x += player.vx;
+            player.y += player.vy;
+
+            // 3. Collisions
+            resolveCollision(player);
+
+            // Death condition (fell off bottom)
+            if (player.y >= World.height - 20) {
+                gameState = 'gameover';
+                restartBtn.classList.remove('hidden');
+                title.innerText = "You hit The Rock Bottom";
+                title.style.display = 'block';
+            }
+
+            // 4. Camera Follow (Smooth Lerp)
+            let targetCamX = player.x - width / 3;
+            let targetCamY = player.y - height / 2;
+            
+            // Clamp camera to world bounds
+            targetCamX = Math.max(0, Math.min(targetCamX, World.width - width));
+            targetCamY = Math.max(0, Math.min(targetCamY, World.height - height));
+
+            camera.x += (targetCamX - camera.x) * 0.1;
+            camera.y += (targetCamY - camera.y) * 0.1;
+        }
+
+        // --- Rendering ---
+        function draw() {
+            ctx.fillStyle = '#0a0a11';
+            ctx.fillRect(0, 0, width, height);
+
+            if (gameState === 'menu') return;
+
+            ctx.save();
+            // Apply camera transform
+            ctx.translate(-camera.x, -camera.y);
+
+            // Parallax Background
+            // Note: In a real advanced setup we'd split layers, but here we just draw the merged background slightly offset
+            ctx.drawImage(bgCanvas, camera.x * 0.5, camera.y * 0.5); 
+            
+            // Foreground / Collisions
+            ctx.drawImage(collisionCanvas, 0, 0);
+
+            // Draw Hook Line
+            if (hook.active) {
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(hook.x, hook.y);
+                ctx.strokeStyle = '#8899aa';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Draw Hook head
+                ctx.save();
+                ctx.translate(hook.x, hook.y);
+                // Rotate towards direction of line
+                let angle = Math.atan2(player.y - hook.y, player.x - hook.x);
+                ctx.rotate(angle);
+                ctx.drawImage(assets.hook, -assets.hook.width/2, -assets.hook.height/2);
+                ctx.restore();
+            }
+
+            // Draw Player
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            // Tilt player based on speed
+            ctx.rotate(player.vx * 0.05);
+            ctx.drawImage(assets.player, -assets.player.width/2, -assets.player.height/2);
+            ctx.restore();
+
+            ctx.restore();
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- Inputs (iPad Touch & Mouse) ---
+        function handlePointerDown(x, y) {
+            if (gameState !== 'playing') return;
+            // Calculate world coordinates
+            let worldX = x + camera.x;
+            let worldY = y + camera.y;
+
+            let angle = Math.atan2(worldY - player.y, worldX - player.x);
+            hook.active = true;
+            hook.attached = false;
+            hook.x = player.x;
+            hook.y = player.y;
+            hook.vx = Math.cos(angle) * hook.speed;
+            hook.vy = Math.sin(angle) * hook.speed;
+        }
+
+        function handlePointerUp() {
+            hook.active = false;
+            hook.attached = false;
+        }
+
+        // Touch events
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+        }, {passive: false});
+        
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            handlePointerUp();
+        });
+
+        // Mouse events (for desktop testing)
+        canvas.addEventListener('mousedown', (e) => {
+            handlePointerDown(e.clientX, e.clientY);
+        });
+        canvas.addEventListener('mouseup', handlePointerUp);
+
+        // --- Game State Management ---
+        function startGame() {
+            startBtn.classList.add('hidden');
+            restartBtn.classList.add('hidden');
+            title.style.display = 'none';
+            
+            // Wait for images to be loaded before generating level
+            setTimeout(() => {
+                ctx.imageSmoothingEnabled = false;
+                generateLevel();
+                
+                player.x = 300;
+                player.y = World.height / 2;
+                player.vx = 0;
+                player.vy = 0;
+                
+                hook.active = false;
+                gameState = 'playing';
+            }, 100);
+        }
+
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+
+        // Start Loop
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
