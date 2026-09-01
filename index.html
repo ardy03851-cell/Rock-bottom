@@ -129,7 +129,9 @@
             hook: new Image(),
             wall: new Image(),
             bg_layer1: new Image(),
-            bg_layer2: new Image()
+            bg_layer2: new Image(),
+            btn_start: new Image(),
+            btn_restart: new Image()
         };
 
         // Fallback generator if images aren't in the textures/ folder yet
@@ -150,13 +152,32 @@
             return c;
         }
 
+        function createButtonFallback(text, color) {
+            let c = document.createElement('canvas');
+            c.width = 220; c.height = 64;
+            let cx = c.getContext('2d');
+            cx.fillStyle = color;
+            cx.fillRect(0, 0, 220, 64);
+            cx.strokeStyle = '#ffffff';
+            cx.lineWidth = 4;
+            cx.strokeRect(2, 2, 216, 60);
+            cx.fillStyle = '#ffffff';
+            cx.font = 'bold 22px Courier New';
+            cx.textAlign = 'center';
+            cx.textBaseline = 'middle';
+            cx.fillText(text, 110, 32);
+            return c.toDataURL();
+        }
+
         // Attempt to load images, apply fallbacks if they fail
         const textureFiles = {
             player: 'textures/player.png',
             hook: 'textures/hook.png',
             wall: 'textures/wall.png',
             bg_layer1: 'textures/bg_layer1.png',
-            bg_layer2: 'textures/bg_layer2.png'
+            bg_layer2: 'textures/bg_layer2.png',
+            btn_start: 'textures/btn_start.png',
+            btn_restart: 'textures/btn_restart.png'
         };
 
         const fallbacks = {
@@ -164,16 +185,26 @@
             hook: createFallback('#ff3366', true).toDataURL(),
             wall: createFallback('#665555').toDataURL(),
             bg_layer1: createFallback('#1a1a24').toDataURL(),
-            bg_layer2: createFallback('#2a2a35').toDataURL()
+            bg_layer2: createFallback('#2a2a35').toDataURL(),
+            btn_start: createButtonFallback('START GAME', '#338844'),
+            btn_restart: createButtonFallback('RESTART', '#883333')
         };
 
         for (let key in assets) {
             assets[key].src = textureFiles[key];
+            assets[key].onload = () => {
+                if (key === 'btn_start') startBtn.style.backgroundImage = `url('${assets[key].src}')`;
+                if (key === 'btn_restart') restartBtn.style.backgroundImage = `url('${assets[key].src}')`;
+            };
             assets[key].onerror = () => {
                 console.warn(`Could not load ${textureFiles[key]}, using fallback.`);
                 assets[key].src = fallbacks[key];
+                if (key === 'btn_start') startBtn.style.backgroundImage = `url('${fallbacks.btn_start}')`;
+                if (key === 'btn_restart') restartBtn.style.backgroundImage = `url('${fallbacks.btn_restart}')`;
             };
         }
+        startBtn.style.backgroundImage = `url('${fallbacks.btn_start}')`;
+        restartBtn.style.backgroundImage = `url('${fallbacks.btn_restart}')`;
 
         // --- World & Collision Setup ---
         const World = {
@@ -288,6 +319,7 @@
             x: 0, y: 0,
             vx: 0, vy: 0,
             speed: 30,
+            ropeLength: 0,
             nodes: []
         };
         let particles = [];
