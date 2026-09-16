@@ -1,391 +1,1501 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Between Worlds</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            touch-action: none; /* Crucial for iPad */
-            user-select: none;
-        }
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-        }
-        #ui-layer {
-            position: absolute;
-            bottom: 10%;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            pointer-events: none;
-            color: white;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            font-size: 24px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
-            transition: opacity 1s ease-in-out;
-            padding: 0 20px;
-            box-sizing: border-box;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2a070d">
+<title>Resonance — Listening Room</title>
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-    <canvas id="gameCanvas"></canvas>
-    <div id="ui-layer"></div>
+<!-- ============================================================
+     ICON SPRITE
+     ============================================================ -->
+<svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.1v13.8L19.2 12z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="7.2" y="5" width="3.4" height="14" rx="1.3" fill="currentColor" stroke="none"/><rect x="13.4" y="5" width="3.4" height="14" rx="1.3" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18.6 5.6v12.8L9.7 12z" fill="currentColor" stroke="none"/><rect x="5" y="5" width="2.6" height="14" rx="1.1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M5.4 5.6v12.8L14.3 12z" fill="currentColor" stroke="none"/><rect x="16.4" y="5" width="2.6" height="14" rx="1.1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-library" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></symbol>
+  <symbol id="i-import" viewBox="0 0 24 24"><path d="M12 16V4.5"/><path d="M7.5 9 12 4.5 16.5 9"/><path d="M4.5 15v3.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 6.5h3c1.4 0 2.7.65 3.5 1.75l3 4A4.3 4.3 0 0 0 17 14h3"/><path d="M17.5 11 20.5 14l-3 3"/><path d="M4 17.5h3c1.4 0 2.7-.65 3.5-1.75l.6-.8"/><path d="M13.4 9.05l.6-.8A4.3 4.3 0 0 1 17 6.5h3"/><path d="M17.5 3.5 20.5 6.5l-3 3"/></symbol>
+  <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2.8 20 5.5l-3 2.7"/><path d="M4.5 11.5V10A4.5 4.5 0 0 1 9 5.5h11"/><path d="M7 21.2 4 18.5l3-2.7"/><path d="M19.5 12.5V14a4.5 4.5 0 0 1-4.5 4.5H4"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4.5 7h9"/><path d="M18 7h1.5"/><circle cx="16" cy="7" r="2.2"/><path d="M4.5 17h1.5"/><path d="M10.5 17h9"/><circle cx="8" cy="17" r="2.2"/></symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24"><path d="M4.5 9.5h3l4-3.2v11.4l-4-3.2h-3z"/><path d="M15.5 9.2a4.2 4.2 0 0 1 0 5.6"/><path d="M18 6.8a7.6 7.6 0 0 1 0 10.4"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.6 15.6 4 4"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11"/><path d="m17.5 6.5-11 11"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 6.5h15"/><path d="M9.5 6.5V4.8A1.3 1.3 0 0 1 10.8 3.5h2.4a1.3 1.3 0 0 1 1.3 1.3v1.7"/><path d="M6.5 6.5 7.4 19a1.5 1.5 0 0 0 1.5 1.4h6.2a1.5 1.5 0 0 0 1.5-1.4l.9-12.5"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5.6l10-2v12"/><circle cx="6.6" cy="18" r="2.6"/><circle cx="16.6" cy="15.6" r="2.6"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-9.4A4.1 4.1 0 0 1 12 8.2a4.1 4.1 0 0 1 7.5 2.4C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-hdd" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="M3.5 12h17"/><circle cx="8" cy="15.2" r="1"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.8 12S6.6 6 12 6s9.2 6 9.2 6-3.8 6-9.2 6-9.2-6-9.2-6z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.6 4.6 4.4L19 7.4"/></symbol>
+</svg>
 
-    <!-- Load the Assets file first -->
-    <script src="assets.js"></script>
-    
-    <!-- The Game Engine -->
-    <script>
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const uiLayer = document.getElementById('ui-layer');
+<!-- ============================================================
+     AMBIENT SCENE
+     ============================================================ -->
+<div class="scene" aria-hidden="true">
+  <div class="sky"></div>
+  <div class="sun"></div>
+  <div class="haze"></div>
+  <div class="band"></div>
+  <div class="arches">
+    <i class="arch a1"></i>
+    <i class="arch a2"></i>
+    <i class="arch a3"></i>
+    <i class="ridge r1"></i>
+    <i class="ridge r2"></i>
+  </div>
+  <div class="grain"></div>
+</div>
+<div class="vignette" aria-hidden="true"></div>
 
-        let width, height;
-        let cameraX = 0;
-        let currentChapter = 0;
-        let activeParagraph = null;
-        let textAlpha = 0;
-        let textState = 'fadein'; // fadein, hold, fadeout
+<!-- ============================================================
+     HUD
+     ============================================================ -->
+<header class="hud ui-layer">
+  <div class="brand">
+    <span class="mark"><svg class="ic"><use href="#i-note"/></svg></span>
+    <div class="brand-text">
+      <b>Resonance</b>
+      <span>Listening Room</span>
+    </div>
+  </div>
+  <div class="status" id="status"><i></i><span id="statusText">Idle</span></div>
+</header>
 
-        // Input state
-        let input = { left: false, right: false };
+<!-- ============================================================
+     RAIL
+     ============================================================ -->
+<nav class="rail ui-layer" aria-label="Primary controls">
+  <button id="railLibrary" title="Library" aria-label="Library"><svg class="ic"><use href="#i-library"/></svg></button>
+  <button id="railImport" title="Import audio" aria-label="Import audio"><svg class="ic"><use href="#i-import"/></svg></button>
+  <hr>
+  <button id="railShuffle" title="Shuffle" aria-label="Shuffle"><svg class="ic"><use href="#i-shuffle"/></svg></button>
+  <button id="railRepeat" title="Repeat" aria-label="Repeat"><svg class="ic"><use href="#i-repeat"/></svg></button>
+  <hr>
+  <button id="railFocus" title="Focus mode" aria-label="Focus mode"><svg class="ic"><use href="#i-eye"/></svg></button>
+  <button id="railSettings" title="Settings" aria-label="Settings"><svg class="ic"><use href="#i-settings"/></svg></button>
+</nav>
 
-        // Player state
-        const player = {
-            x: 100,
-            y: 0,
-            vx: 0,
-            width: 10,
-            height: 30,
-            bobble: 0
-        };
+<!-- ============================================================
+     CENTER
+     ============================================================ -->
+<main class="center ui-layer">
+  <h1 id="nowTitle">Resonance</h1>
+  <p id="nowMeta">No track loaded</p>
+</main>
 
-        // Particles for atmosphere (bokeh/dust)
-        const particles = [];
-        for(let i=0; i<50; i++) {
-            particles.push({
-                x: Math.random() * 3000,
-                y: Math.random() * 1000,
-                size: Math.random() * 4 + 1,
-                speed: Math.random() * 0.5 + 0.1
-            });
-        }
+<!-- ============================================================
+     DOCK
+     ============================================================ -->
+<div class="dock ui-layer" role="group" aria-label="Transport">
+  <button class="btn icon" id="dockPrev" aria-label="Previous track"><svg class="ic"><use href="#i-prev"/></svg></button>
+  <button class="btn primary icon" id="dockPlay" aria-label="Play">
+    <svg class="ic" id="dockPlayIcon"><use href="#i-play"/></svg>
+  </button>
+  <button class="btn icon" id="dockNext" aria-label="Next track"><svg class="ic"><use href="#i-next"/></svg></button>
 
-        // --- SETUP & RESIZE ---
-        function resize() {
-            const dpr = window.devicePixelRatio || 1;
-            width = window.innerWidth;
-            height = window.innerHeight;
-            canvas.width = width * dpr;
-            canvas.height = height * dpr;
-            ctx.scale(dpr, dpr);
-            
-            // Set player base Y position to 80% of screen
-            player.y = height * 0.8; 
-        }
-        window.addEventListener('resize', resize);
-        resize();
+  <div class="scrub">
+    <input class="range" type="range" id="seek" min="0" max="1000" step="1" value="0" aria-label="Seek">
+    <div class="scrub-meta"><span id="timeNow">0:00</span><span id="timeTotal">0:00</span></div>
+  </div>
 
-        // --- INPUT HANDLING (iPAD OPTIMIZED) ---
-        function handleTouchStart(e) {
-            e.preventDefault();
-            const touchX = e.touches[0].clientX;
-            if (touchX < width / 2) input.left = true;
-            else input.right = true;
-        }
+  <div class="vol">
+    <svg class="ic"><use href="#i-volume"/></svg>
+    <input class="range vol-range" type="range" id="volume" min="0" max="1" step="0.01" value="0.9" aria-label="Volume">
+  </div>
 
-        function handleTouchEnd(e) {
-            e.preventDefault();
-            input.left = false;
-            input.right = false;
-        }
+  <div class="read">
+    <b id="readTitle">—</b>
+    <small id="readSub">Queue empty</small>
+  </div>
+</div>
 
-        // Mouse fallback for desktop testing
-        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-        canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
-        canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
-        
-        canvas.addEventListener('mousedown', (e) => {
-            if (e.clientX < width / 2) input.left = true;
-            else input.right = true;
-        });
-        canvas.addEventListener('mouseup', () => { input.left = false; input.right = false; });
-        canvas.addEventListener('mouseleave', () => { input.left = false; input.right = false; });
+<!-- ============================================================
+     VAULT (LIBRARY)
+     ============================================================ -->
+<section class="vault" id="vault" aria-hidden="true">
+  <aside class="nav">
+    <h2>Library</h2>
+    <p>Audio is stored locally in this browser. Nothing leaves the device.</p>
 
-        // --- GAME LOGIC ---
-        function update() {
-            // Player Movement
-            if (input.left) player.vx = -GAME_ASSETS.config.walkSpeed;
-            else if (input.right) player.vx = GAME_ASSETS.config.walkSpeed;
-            else player.vx = 0;
+    <label class="search">
+      <svg class="ic"><use href="#i-search"/></svg>
+      <input type="search" id="search" placeholder="Search title, artist, album" autocomplete="off" spellcheck="false">
+    </label>
 
-            player.x += player.vx;
-            
-            // Boundaries
-            if (player.x < 0) player.x = 0;
-            if (player.x > GAME_ASSETS.config.totalWorldWidth) player.x = GAME_ASSETS.config.totalWorldWidth;
+    <div class="filters" id="filters">
+      <button data-filter="all" class="active">All tracks</button>
+      <button data-filter="recent">Recently added</button>
+      <button data-filter="favorites">Favourites</button>
+      <button data-filter="long">Longer than 5 minutes</button>
+    </div>
 
-            // Walking bobble animation
-            if (player.vx !== 0) player.bobble += 0.2;
-            else player.bobble = 0;
+    <div class="storage">
+      <div class="storage-head"><svg class="ic"><use href="#i-hdd"/></svg><span>Local storage</span></div>
+      <div class="storage-bar"><i id="storageFill"></i></div>
+      <div class="storage-text" id="storageText">—</div>
+      <button class="spill" id="btnPersist">Request persistent storage</button>
+    </div>
 
-            // Camera follow (keeps player roughly 1/3 from the left)
-            let targetCamX = player.x - width / 3;
-            if (targetCamX < 0) targetCamX = 0;
-            // Smooth camera
-            cameraX += (targetCamX - cameraX) * 0.1;
+    <div class="hint">Drag audio files anywhere on this window to import.<br>MP3 · M4A · AAC · WAV · FLAC · OGG · OPUS</div>
+  </aside>
 
-            // Determine current chapter based on player X
-            const chapter = GAME_ASSETS.chapters.find(c => player.x >= c.startX && player.x <= c.endX) || GAME_ASSETS.chapters[GAME_ASSETS.chapters.length - 1];
-            currentChapter = chapter.id;
+  <div class="main">
+    <div class="vhead">
+      <div>
+        <h2>Vault</h2>
+        <p id="vaultCount">0 tracks</p>
+      </div>
+      <div class="vhead-actions">
+        <button class="btn" id="btnImport"><svg class="ic"><use href="#i-import"/></svg><span>Import</span></button>
+        <button class="btn danger" id="btnClear"><svg class="ic"><use href="#i-trash"/></svg><span>Clear</span></button>
+        <button class="close" id="btnCloseVault" aria-label="Close library"><svg class="ic"><use href="#i-close"/></svg></button>
+      </div>
+    </div>
 
-            // Text Trigger Logic
-            let newParagraph = null;
-            for (let p of chapter.paragraphs) {
-                if (player.x > p.x && !p.triggered) {
-                    newParagraph = p;
-                    p.triggered = true;
-                    break; // Only trigger one at a time
-                }
-            }
+    <div class="grid" id="grid"></div>
 
-            if (newParagraph) {
-                activeParagraph = newParagraph;
-                textState = 'fadein';
-                textAlpha = 0;
-                uiLayer.innerText = activeParagraph.text;
-                uiLayer.style.opacity = 0;
-            }
+    <div class="empty" id="empty" hidden>
+      <svg class="ic"><use href="#i-note"/></svg>
+      <b>Vault is empty</b>
+      <span>Import audio files to begin.</span>
+    </div>
+  </div>
+</section>
 
-            // Text fade logic
-            if (activeParagraph) {
-                if (textState === 'fadein') {
-                    textAlpha += 0.02;
-                    if (textAlpha >= 1) { textAlpha = 1; textState = 'hold'; }
-                } else if (textState === 'hold') {
-                    // Add a delay before fading out (simulated by frames)
-                    if (!activeParagraph.holdTimer) activeParagraph.holdTimer = 0;
-                    activeParagraph.holdTimer++;
-                    if (activeParagraph.holdTimer > 180) { // ~3 seconds at 60fps
-                        textState = 'fadeout';
-                    }
-                } else if (textState === 'fadeout') {
-                    textAlpha -= 0.02;
-                    if (textAlpha <= 0) {
-                        textAlpha = 0;
-                        activeParagraph = null;
-                    }
-                }
-                uiLayer.style.opacity = textAlpha;
-            }
+<!-- ============================================================
+     SETTINGS
+     ============================================================ -->
+<section class="settings" id="settings" aria-hidden="true">
+  <div class="settings-panel">
+    <div class="settings-head">
+      <span class="gear"><svg class="ic"><use href="#i-settings"/></svg></span>
+      <div>
+        <h2>Settings</h2>
+        <small>Playback · Interface · Storage</small>
+      </div>
+      <span class="spacer"></span>
+      <button class="settings-close" id="btnCloseSettings" aria-label="Close settings"><svg class="ic"><use href="#i-close"/></svg></button>
+    </div>
 
-            // Update particles
-            particles.forEach(p => {
-                p.y -= p.speed;
-                if (p.y < 0) p.y = height;
-            });
-        }
+    <div class="settings-body">
 
-        // --- RENDERING ---
-        function draw() {
-            const palette = GAME_ASSETS.chapters[currentChapter].palette;
+      <div class="sgroup">
+        <div class="sgroup-head"><svg class="ic"><use href="#i-play"/></svg><span>Playback</span><i class="line"></i></div>
 
-            // 1. Sky Background
-            const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
-            skyGrad.addColorStop(0, palette.skyTop);
-            skyGrad.addColorStop(1, palette.skyBottom);
-            ctx.fillStyle = skyGrad;
-            ctx.fillRect(0, 0, width, height);
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-next"/></svg></span>
+            <div><div class="setting-name">Autoplay next</div><div class="setting-desc">Continue automatically when a track ends.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setAutoplay" role="switch" aria-checked="false"></button></div>
+        </div>
 
-            // 2. Far Parallax Layer (Giant Hands & Celestial bodies)
-            ctx.save();
-            ctx.translate(-cameraX * GAME_ASSETS.config.parallaxFar, 0);
-            drawFarBackground(palette);
-            ctx.restore();
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-shuffle"/></svg></span>
+            <div><div class="setting-name">Shuffle</div><div class="setting-desc">Pick the next track at random.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setShuffle" role="switch" aria-checked="false"></button></div>
+        </div>
 
-            // 3. Mid Parallax Layer (Trees, Vines, Stage structure)
-            ctx.save();
-            ctx.translate(-cameraX * GAME_ASSETS.config.parallaxMid, 0);
-            drawMidBackground(palette);
-            ctx.restore();
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-repeat"/></svg></span>
+            <div><div class="setting-name">Repeat</div><div class="setting-desc">Loop the queue or a single track.</div></div>
+          </div>
+          <div class="setting-control">
+            <div class="quality-selector" id="setRepeat">
+              <button data-repeat="off">Off</button>
+              <button data-repeat="all">All</button>
+              <button data-repeat="one">One</button>
+            </div>
+          </div>
+        </div>
 
-            // 4. Particles / Fog overlay
-            ctx.fillStyle = palette.fog;
-            for(let p of particles) {
-                ctx.beginPath();
-                ctx.arc(p.x - (cameraX * 0.8), p.y, p.size, 0, Math.PI * 2);
-                ctx.fill();
-            }
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-volume"/></svg></span>
+            <div><div class="setting-name">Playback speed</div><div class="setting-desc">Adjust the rate of playback.</div></div>
+          </div>
+          <div class="setting-control">
+            <input class="range setting-slider" type="range" id="setSpeed" min="0.5" max="2" step="0.05" value="1">
+            <span class="setting-value" id="setSpeedVal">1.00×</span>
+          </div>
+        </div>
+      </div>
 
-            // 5. Near Parallax Layer (Ground)
-            ctx.save();
-            ctx.translate(-cameraX * GAME_ASSETS.config.parallaxNear, 0);
-            drawNearBackground(palette);
-            ctx.restore();
+      <div class="sgroup">
+        <div class="sgroup-head"><svg class="ic"><use href="#i-eye"/></svg><span>Interface</span><i class="line"></i></div>
 
-            // 6. Player Character
-            drawPlayer(palette);
-        }
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-note"/></svg></span>
+            <div><div class="setting-name">Ambient scene</div><div class="setting-desc">Show the background artwork.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setScene" role="switch" aria-checked="true"></button></div>
+        </div>
 
-        function drawFarBackground(palette) {
-            // Draw the giant ethereal hands from Image 1
-            ctx.fillStyle = 'rgba(150, 200, 200, 0.4)';
-            ctx.beginPath();
-            ctx.moveTo(800, 100);
-            ctx.bezierCurveTo(900, 300, 1200, 400, 1500, 300);
-            ctx.bezierCurveTo(1300, 200, 1000, 100, 800, 100);
-            ctx.fill();
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-library"/></svg></span>
+            <div><div class="setting-name">Card motion</div><div class="setting-desc">Lift cards on hover and animate them in.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setCardHover" role="switch" aria-checked="true"></button></div>
+        </div>
 
-            ctx.beginPath();
-            ctx.moveTo(1200, 500);
-            ctx.bezierCurveTo(1000, 600, 800, 800, 900, 900);
-            ctx.bezierCurveTo(1100, 850, 1300, 700, 1200, 500);
-            ctx.fill();
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-eye"/></svg></span>
+            <div><div class="setting-name">Reduce motion</div><div class="setting-desc">Minimise transitions and animation.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setReduceMotion" role="switch" aria-checked="false"></button></div>
+        </div>
 
-            // Draw the Dark ceiling shapes from Image 2
-            if (currentChapter === 1) {
-                ctx.fillStyle = '#0A0A10';
-                for(let i=0; i<5; i++) {
-                    ctx.beginPath();
-                    ctx.moveTo(1500 + i*400, 0);
-                    ctx.lineTo(1800 + i*400, 100);
-                    ctx.lineTo(1300 + i*400, 150);
-                    ctx.fill();
-                }
-            }
-        }
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-check"/></svg></span>
+            <div><div class="setting-name">High contrast</div><div class="setting-desc">Strengthen borders and text contrast.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setContrast" role="switch" aria-checked="false"></button></div>
+        </div>
+      </div>
 
-        function drawMidBackground(palette) {
-            // Draw Vines (Image 1)
-            ctx.strokeStyle = palette.vine;
-            ctx.lineWidth = 15;
-            ctx.lineCap = 'round';
-            
-            ctx.beginPath();
-            ctx.moveTo(0, 200);
-            ctx.bezierCurveTo(300, 100, 500, 400, 800, 200);
-            ctx.stroke();
+      <div class="sgroup">
+        <div class="sgroup-head"><svg class="ic"><use href="#i-hdd"/></svg><span>Storage</span><i class="line"></i></div>
 
-            // Draw the Stage (Image 2)
-            if (currentChapter === 1) {
-                ctx.fillStyle = '#0A0A10';
-                // Stage base
-                ctx.fillRect(1800, height * 0.6, 1000, height * 0.4);
-                // Stage pillars
-                ctx.fillRect(2000, height * 0.4, 50, height * 0.2);
-                ctx.fillRect(2500, height * 0.4, 50, height * 0.2);
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-hdd"/></svg></span>
+            <div><div class="setting-name">Persistent storage</div><div class="setting-desc" id="persistDesc">Ask the browser to protect the library from cleanup.</div></div>
+          </div>
+          <div class="setting-control"><button class="spill" id="setPersist">Request</button></div>
+        </div>
 
-                // Neon Lights
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = palette.accent;
-                ctx.fillStyle = palette.accent;
-                
-                // String lights
-                for(let i=0; i<10; i++) {
-                    ctx.beginPath();
-                    ctx.arc(1900 + i*80, height * 0.45 + Math.sin(i)*20, 4, 0, Math.PI*2);
-                    ctx.fill();
-                }
-                
-                // Stage figure (singer)
-                ctx.fillStyle = palette.accent;
-                ctx.beginPath();
-                ctx.moveTo(2200, height * 0.6);
-                ctx.lineTo(2230, height * 0.4);
-                ctx.lineTo(2260, height * 0.6);
-                ctx.fill();
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-trash"/></svg></span>
+            <div><div class="setting-name">Erase library</div><div class="setting-desc">Delete every imported file from this browser.</div></div>
+          </div>
+          <div class="setting-control"><button class="spill danger" id="setClear">Erase</button></div>
+        </div>
+      </div>
 
-                ctx.shadowBlur = 0; // Reset shadow
-            }
-        }
+    </div>
 
-        function drawNearBackground(palette) {
-            // Ground base
-            ctx.fillStyle = palette.ground;
-            ctx.beginPath();
-            ctx.moveTo(0, height * 0.8);
-            // Create uneven terrain
-            for(let i=0; i<GAME_ASSETS.config.totalWorldWidth; i+=200) {
-                ctx.lineTo(i, height * 0.8 + Math.sin(i * 0.01) * 20);
-            }
-            ctx.lineTo(GAME_ASSETS.config.totalWorldWidth, height);
-            ctx.lineTo(0, height);
-            ctx.fill();
+    <div class="settings-foot">
+      <span class="saved-badge" id="savedBadge">Settings stored locally</span>
+      <button class="spill" id="btnDoneSettings">Done</button>
+    </div>
+  </div>
+</section>
 
-            // Foreground grass/vines details
-            ctx.strokeStyle = palette.vine;
-            ctx.lineWidth = 4;
-            for(let i=0; i<GAME_ASSETS.config.totalWorldWidth; i+=100) {
-                ctx.beginPath();
-                ctx.moveTo(i, height * 0.8 + Math.sin(i * 0.01) * 20);
-                ctx.quadraticCurveTo(
-                    i + 20, height * 0.75 + Math.sin(i * 0.01) * 20,
-                    i + 10, height * 0.7 + Math.sin(i * 0.01) * 20
-                );
-                ctx.stroke();
-            }
-        }
+<!-- ============================================================
+     FEEDBACK LAYERS
+     ============================================================ -->
+<div class="dropzone" id="dropzone" aria-hidden="true">
+  <div class="dropzone-inner">
+    <svg class="ic"><use href="#i-import"/></svg>
+    <b>Drop audio to import</b>
+    <span>Files stay on this device</span>
+  </div>
+</div>
 
-        function drawPlayer(palette) {
-            // Position player on screen relative to camera
-            const screenX = player.x - cameraX;
-            // Apply bobble effect
-            const screenY = player.y + Math.sin(player.bobble) * 4;
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <svg class="ic"><use href="#i-import"/></svg>
+  <div class="toast-body">
+    <span id="toastText">Importing…</span>
+    <div class="toast-bar" id="toastBar"><i id="toastFill"></i></div>
+  </div>
+</div>
 
-            ctx.save();
-            ctx.translate(screenX, screenY);
+<div class="cinema-hint" id="cinemaHint">Tap anywhere to exit focus mode</div>
 
-            // Player shadow
-            ctx.fillStyle = 'rgba(0,0,0,0.3)';
-            ctx.beginPath();
-            ctx.ellipse(0, 10, 15, 5, 0, 0, Math.PI * 2);
-            ctx.fill();
+<input type="file" id="fileInput" accept="audio/*,.mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.opus,.aif,.aiff" multiple hidden>
 
-            // Player body (The glowing figure)
-            ctx.fillStyle = palette.accent;
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = palette.accent;
-            
-            // Draw a small cloak/dress shape
-            ctx.beginPath();
-            ctx.moveTo(-10, 10); // bottom left
-            ctx.lineTo(10, 10);  // bottom right
-            ctx.lineTo(5, -10);  // waist right
-            ctx.lineTo(5, -20);  // head right
-            ctx.lineTo(-5, -20); // head left
-            ctx.lineTo(-5, -10); // waist left
-            ctx.closePath();
-            ctx.fill();
+<script>
+(function () {
+'use strict';
 
-            // Head
-            ctx.beginPath();
-            ctx.arc(0, -25, 5, 0, Math.PI * 2);
-            ctx.fill();
+/* ============================================================
+   HELPERS
+   ============================================================ */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const tick = () => new Promise(r => setTimeout(r, 0));
+const uid = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
-            ctx.restore();
-        }
+function fmtTime(s) {
+  if (!isFinite(s) || s < 0) s = 0;
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return m + ':' + (sec < 10 ? '0' : '') + sec;
+}
+function fmtSize(b) {
+  if (!b) return '0 B';
+  const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
+  return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + u[i];
+}
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function loadJSON(key, fallback) {
+  try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; }
+  catch (e) { return fallback; }
+}
 
-        // --- GAME LOOP ---
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
+/* ============================================================
+   INDEXEDDB — meta / blobs / art
+   ============================================================ */
+const DB_NAME = 'resonance-db';
+const DB_VERSION = 1;
+let db = null;
 
-        // Start the game
-        gameLoop();
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const d = req.result;
+      if (!d.objectStoreNames.contains('meta'))  d.createObjectStore('meta',  { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('blobs')) d.createObjectStore('blobs', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('art'))   d.createObjectStore('art',   { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+const store = (n, m) => db.transaction(n, m).objectStore(n);
 
-    </script>
+function idbPut(name, val) {
+  return new Promise((res, rej) => {
+    const r = store(name, 'readwrite').put(val);
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+function idbGet(name, key) {
+  return new Promise((res, rej) => {
+    const r = store(name, 'readonly').get(key);
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+function idbDel(name, key) {
+  return new Promise((res, rej) => {
+    const r = store(name, 'readwrite').delete(key);
+    r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+  });
+}
+function idbAll(name) {
+  return new Promise((res, rej) => {
+    const r = store(name, 'readonly').getAll();
+    r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error);
+  });
+}
+function idbClear(name) {
+  return new Promise((res, rej) => {
+    const r = store(name, 'readwrite').clear();
+    r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+  });
+}
+
+/* ============================================================
+   ID3v2 TAG READER (title / artist / album / cover)
+   ============================================================ */
+const syncsafe = (b, o) => ((b[o] & 0x7f) << 21) | ((b[o + 1] & 0x7f) << 14) | ((b[o + 2] & 0x7f) << 7) | (b[o + 3] & 0x7f);
+const readU32  = (b, o) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+const str3 = (b, o) => String.fromCharCode(b[o], b[o + 1], b[o + 2]);
+const str4 = (b, o) => String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]);
+
+function decodeText(bytes) {
+  if (!bytes || bytes.length < 1) return '';
+  const enc = bytes[0];
+  const body = bytes.subarray(1);
+  let out = '';
+  try {
+    if (enc === 0) out = new TextDecoder('windows-1252').decode(body);
+    else if (enc === 1) out = new TextDecoder('utf-16').decode(body);
+    else if (enc === 2) out = new TextDecoder('utf-16be').decode(body);
+    else out = new TextDecoder('utf-8').decode(body);
+  } catch (e) {
+    try { out = new TextDecoder('utf-8').decode(body); } catch (e2) { out = ''; }
+  }
+  return out.replace(/\u0000+$/g, '').trim();
+}
+
+function parseAPIC(d, v2) {
+  let p = 0;
+  const enc = d[p++];
+  let mime;
+  if (v2) {
+    mime = 'image/' + String.fromCharCode(d[1], d[2], d[3]).toLowerCase();
+    p = 4;
+  } else {
+    const s = p;
+    while (p < d.length && d[p] !== 0) p++;
+    mime = String.fromCharCode.apply(null, Array.prototype.slice.call(d.subarray(s, p))) || 'image/jpeg';
+    p++;
+  }
+  p++; // picture type
+  if (enc === 1 || enc === 2) {
+    while (p + 1 < d.length && !(d[p] === 0 && d[p + 1] === 0)) p += 2;
+    p += 2;
+  } else {
+    while (p < d.length && d[p] !== 0) p++;
+    p++;
+  }
+  const img = d.subarray(p);
+  if (img.length < 256) return null;
+  return new Blob([img], { type: mime && mime.indexOf('/') > 0 ? mime : 'image/jpeg' });
+}
+
+function parseID3(buffer) {
+  try {
+    const b = new Uint8Array(buffer);
+    if (b.length < 10) return null;
+    if (b[0] !== 0x49 || b[1] !== 0x44 || b[2] !== 0x33) return null; // "ID3"
+    const ver = b[3];
+    if (ver < 2 || ver > 4) return null;
+    const flags = b[5];
+    const size = syncsafe(b, 6);
+    let pos = 10;
+
+    if (flags & 0x40) { // extended header
+      if (ver === 3) pos += 4 + readU32(b, pos);
+      else if (ver === 4) pos += syncsafe(b, pos);
+    }
+
+    const end = Math.min(b.length, 10 + size);
+    const tags = { title: '', artist: '', album: '', art: null };
+
+    while (pos + 6 < end) {
+      let id, fsize, hlen;
+      if (ver === 2) {
+        id = str3(b, pos);
+        fsize = (b[pos + 3] << 16) | (b[pos + 4] << 8) | b[pos + 5];
+        hlen = 6;
+      } else {
+        id = str4(b, pos);
+        fsize = ver === 4 ? syncsafe(b, pos + 4) : readU32(b, pos + 4);
+        hlen = 10;
+      }
+      if (!/^[A-Z0-9]{3,4}$/.test(id)) break;
+
+      const start = pos + hlen;
+      if (fsize <= 0 || start + fsize > end) break;
+      const data = b.subarray(start, start + fsize);
+
+      if (id === 'TIT2' || id === 'TT2') tags.title = decodeText(data);
+      else if (id === 'TPE1' || id === 'TP1') tags.artist = decodeText(data);
+      else if (id === 'TALB' || id === 'TAL') tags.album = decodeText(data);
+      else if ((id === 'APIC' || id === 'PIC') && !tags.art) {
+        try { tags.art = parseAPIC(data, ver === 2); } catch (e) { /* ignore */ }
+      }
+      pos = start + fsize;
+    }
+    return tags;
+  } catch (e) {
+    return null;
+  }
+}
+
+/* ============================================================
+   FILE NAME FALLBACK
+   ============================================================ */
+function parseName(name) {
+  const base = name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+  const parts = base.split(/\s+-\s+/);
+  if (parts.length >= 2) {
+    return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
+  }
+  return { artist: '', title: base };
+}
+
+function probeDuration(file) {
+  return new Promise(resolve => {
+    let settled = false;
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('audio');
+    const finish = (d) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { a.removeAttribute('src'); a.load(); } catch (e) {}
+      URL.revokeObjectURL(url);
+      resolve(isFinite(d) && d > 0 ? d : 0);
+    };
+    const timer = setTimeout(() => finish(0), 12000);
+    a.preload = 'metadata';
+    a.onloadedmetadata = () => finish(a.duration);
+    a.onerror = () => finish(0);
+    a.src = url;
+  });
+}
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const LS_KEY = 'resonance.settings.v1';
+const DEFAULTS = {
+  volume: 0.9,
+  shuffle: false,
+  repeat: 'off',
+  autoplay: true,
+  speed: 1,
+  scene: true,
+  cardHover: true,
+  reduceMotion: false,
+  highContrast: false
+};
+let settings = Object.assign({}, DEFAULTS, loadJSON(LS_KEY, {}));
+
+const state = {
+  tracks: [],
+  view: [],
+  filter: 'all',
+  query: '',
+  currentId: null,
+  queue: [],
+  importing: false,
+  artUrls: new Map(),
+  artObserver: null
+};
+
+const audio = new Audio();
+audio.preload = 'metadata';
+audio.volume = settings.volume;
+audio.setAttribute('playsinline', '');
+document.body.appendChild(audio);
+
+let currentObjectURL = null;
+let lastSessionArtURL = null;
+let scrubbing = false;
+
+/* ============================================================
+   DOM
+   ============================================================ */
+const dom = {
+  status: $('#status'),
+  statusText: $('#statusText'),
+  nowTitle: $('#nowTitle'),
+  nowMeta: $('#nowMeta'),
+  dockPlayIcon: $('#dockPlayIcon'),
+  dockPlay: $('#dockPlay'),
+  dockPrev: $('#dockPrev'),
+  dockNext: $('#dockNext'),
+  seek: $('#seek'),
+  timeNow: $('#timeNow'),
+  timeTotal: $('#timeTotal'),
+  volume: $('#volume'),
+  readTitle: $('#readTitle'),
+  readSub: $('#readSub'),
+  vault: $('#vault'),
+  grid: $('#grid'),
+  empty: $('#empty'),
+  vaultCount: $('#vaultCount'),
+  search: $('#search'),
+  filters: $('#filters'),
+  storageFill: $('#storageFill'),
+  storageText: $('#storageText'),
+  fileInput: $('#fileInput'),
+  toast: $('#toast'),
+  toastText: $('#toastText'),
+  toastFill: $('#toastFill'),
+  toastBar: $('#toastBar'),
+  dropzone: $('#dropzone'),
+  settings: $('#settings'),
+  railShuffle: $('#railShuffle'),
+  railRepeat: $('#railRepeat'),
+  savedBadge: $('#savedBadge'),
+  persistDesc: $('#persistDesc')
+};
+
+/* ============================================================
+   SETTINGS
+   ============================================================ */
+function saveSettings() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(settings)); } catch (e) {}
+}
+function flashSaved() {
+  dom.savedBadge.classList.add('flash');
+  dom.savedBadge.textContent = 'Saved';
+  clearTimeout(flashSaved._t);
+  flashSaved._t = setTimeout(() => {
+    dom.savedBadge.classList.remove('flash');
+    dom.savedBadge.textContent = 'Settings stored locally';
+  }, 1400);
+}
+
+function applySettings() {
+  document.body.classList.toggle('no-scene', !settings.scene);
+  document.body.classList.toggle('card-hover', !!settings.cardHover);
+  document.body.classList.toggle('reduce-motion', !!settings.reduceMotion);
+  document.body.classList.toggle('high-contrast', !!settings.highContrast);
+  audio.volume = settings.volume;
+  audio.playbackRate = settings.speed;
+  paintRange(dom.volume, settings.volume * 100);
+  syncShuffleUI();
+  syncRepeatUI();
+}
+
+function bindSwitch(el, key, after) {
+  if (!el) return;
+  el.addEventListener('click', () => {
+    settings[key] = !settings[key];
+    saveSettings();
+    paintSwitch(el, settings[key]);
+    if (after) after();
+    flashSaved();
+  });
+}
+function paintSwitch(el, on) {
+  el.classList.toggle('on', !!on);
+  el.setAttribute('aria-checked', String(!!on));
+}
+
+function syncShuffleUI() {
+  paintSwitch($('#setShuffle'), settings.shuffle);
+  dom.railShuffle.classList.toggle('on', settings.shuffle);
+}
+function syncRepeatUI() {
+  $$('#setRepeat button').forEach(b => b.classList.toggle('active', b.dataset.repeat === settings.repeat));
+  dom.railRepeat.classList.toggle('on', settings.repeat !== 'off');
+  dom.railRepeat.title = 'Repeat: ' + settings.repeat;
+}
+
+function paintRange(el, pct) {
+  el.style.setProperty('--pct', clamp(pct, 0, 100) + '%');
+}
+
+/* ============================================================
+   STATUS / NOW PLAYING
+   ============================================================ */
+function setStatus(kind, label) {
+  const map = { idle: 'Idle', playing: 'Playing', paused: 'Paused', importing: 'Importing', ready: 'Ready' };
+  dom.statusText.textContent = label || map[kind] || 'Idle';
+  dom.status.classList.toggle('pulse', kind === 'importing' || kind === 'paused');
+  dom.status.classList.toggle('playing', kind === 'playing');
+}
+
+function updateNowPlaying(meta) {
+  if (!meta) {
+    dom.nowTitle.textContent = 'Resonance';
+    dom.nowMeta.textContent = 'No track loaded';
+    dom.readTitle.textContent = '—';
+    dom.readSub.textContent = 'Queue empty';
+    return;
+  }
+  dom.nowTitle.textContent = meta.title || meta.name;
+  dom.nowMeta.textContent = [meta.artist, meta.album].filter(Boolean).join(' · ') || 'Unknown artist';
+  dom.readTitle.textContent = meta.title || meta.name;
+  dom.readSub.textContent = (meta.artist || 'Unknown artist') + (meta.duration ? ' · ' + fmtTime(meta.duration) : '');
+}
+
+function setPlayIcon(playing) {
+  const use = dom.dockPlayIcon.querySelector('use');
+  if (use) use.setAttribute('href', playing ? '#i-pause' : '#i-play');
+  dom.dockPlay.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+}
+
+function updateMediaSession(meta, art) {
+  if (!('mediaSession' in navigator)) return;
+  try {
+    if (lastSessionArtURL) { URL.revokeObjectURL(lastSessionArtURL); lastSessionArtURL = null; }
+    const artwork = [];
+    if (art) {
+      lastSessionArtURL = URL.createObjectURL(art);
+      artwork.push({ src: lastSessionArtURL, sizes: '512x512', type: art.type || 'image/jpeg' });
+    }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: meta.title || meta.name,
+      artist: meta.artist || 'Unknown artist',
+      album: meta.album || 'Resonance',
+      artwork: artwork
+    });
+  } catch (e) { /* ignore */ }
+}
+
+/* ============================================================
+   PLAYBACK
+   ============================================================ */
+async function playTrack(id, autoplay) {
+  if (autoplay === undefined) autoplay = true;
+  const meta = state.tracks.find(t => t.id === id);
+  if (!meta) return;
+
+  let rec;
+  try { rec = await idbGet('blobs', id); } catch (e) { rec = null; }
+  if (!rec || !rec.blob) { toast('Track data is missing from storage.'); return; }
+
+  if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
+  currentObjectURL = URL.createObjectURL(rec.blob);
+
+  audio.src = currentObjectURL;
+  audio.playbackRate = settings.speed;
+  state.currentId = id;
+
+  updateNowPlaying(meta);
+  updateMediaSession(meta, rec.art || null);
+  markActiveCard();
+
+  if (autoplay) {
+    try {
+      await audio.play();
+      setStatus('playing');
+      setPlayIcon(true);
+    } catch (e) {
+      setStatus('paused');
+      setPlayIcon(false);
+    }
+  }
+}
+
+function buildQueue(preferredId) {
+  const list = state.view.length ? state.view.map(t => t.id) : state.tracks.map(t => t.id);
+  state.queue = list.slice();
+  if (preferredId && state.queue.indexOf(preferredId) === -1) state.queue.unshift(preferredId);
+}
+
+function stepIndex(dir) {
+  const q = state.queue.length ? state.queue : state.tracks.map(t => t.id);
+  if (!q.length) return -1;
+  let i = q.indexOf(state.currentId);
+  if (i === -1) i = 0;
+
+  if (settings.shuffle && dir > 0) {
+    if (q.length === 1) return 0;
+    let r;
+    do { r = Math.floor(Math.random() * q.length); } while (r === i);
+    return r;
+  }
+  let n = i + dir;
+  if (n >= q.length) return settings.repeat === 'all' ? 0 : -1;
+  if (n < 0) return settings.repeat === 'all' ? q.length - 1 : -1;
+  return n;
+}
+
+function playNext(dir) {
+  const q = state.queue.length ? state.queue : state.tracks.map(t => t.id);
+  state.queue = q;
+  const idx = stepIndex(dir);
+  if (idx < 0) { stopPlayback(); return; }
+  playTrack(q[idx], true);
+}
+
+function stopPlayback() {
+  audio.pause();
+  setStatus('idle');
+  setPlayIcon(false);
+}
+
+audio.addEventListener('play', () => { setStatus('playing'); setPlayIcon(true); });
+audio.addEventListener('pause', () => {
+  if (audio.ended) return;
+  setStatus('paused');
+  setPlayIcon(false);
+});
+audio.addEventListener('ended', () => {
+  if (settings.repeat === 'one') {
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+    return;
+  }
+  if (settings.autoplay) playNext(1);
+  else stopPlayback();
+});
+audio.addEventListener('error', () => {
+  setStatus('paused', 'Error');
+  setPlayIcon(false);
+});
+
+audio.addEventListener('timeupdate', updateTimeUI);
+audio.addEventListener('loadedmetadata', updateTimeUI);
+audio.addEventListener('durationchange', updateTimeUI);
+
+function updateTimeUI() {
+  const dur = isFinite(audio.duration) ? audio.duration : 0;
+  const cur = isFinite(audio.currentTime) ? audio.currentTime : 0;
+  dom.timeTotal.textContent = fmtTime(dur);
+  if (!scrubbing) {
+    dom.timeNow.textContent = fmtTime(cur);
+    const pct = dur ? (cur / dur) * 100 : 0;
+    dom.seek.value = String(Math.round((cur / (dur || 1)) * 1000));
+    paintRange(dom.seek, pct);
+  }
+}
+
+/* ============================================================
+   LIBRARY VIEW
+   ============================================================ */
+function filterTracks() {
+  let list = state.tracks.slice();
+  const q = state.query.trim().toLowerCase();
+  if (q) {
+    list = list.filter(t => ((t.title || '') + ' ' + (t.artist || '') + ' ' + (t.album || '') + ' ' + (t.name || '')).toLowerCase().indexOf(q) !== -1);
+  }
+  if (state.filter === 'recent') {
+    const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 14;
+    list = list.filter(t => t.added > cutoff);
+    list.sort((a, b) => b.added - a.added);
+  } else if (state.filter === 'favorites') {
+    list = list.filter(t => t.favorite);
+    list.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
+  } else if (state.filter === 'long') {
+    list = list.filter(t => t.duration > 300);
+    list.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
+  } else {
+    list.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
+  }
+  return list;
+}
+
+let renderToken = 0;
+
+function refresh() {
+  state.view = filterTracks();
+  renderGrid();
+  updateVaultMeta();
+  updateStorage();
+}
+
+function renderGrid() {
+  const token = ++renderToken;
+
+  // release previously rendered artwork urls
+  state.artUrls.forEach(url => { if (url) URL.revokeObjectURL(url); });
+  state.artUrls.clear();
+  if (state.artObserver) { state.artObserver.disconnect(); }
+  state.artObserver = ('IntersectionObserver' in window)
+    ? new IntersectionObserver(onArtIntersect, { rootMargin: '400px 0px' })
+    : null;
+
+  dom.grid.innerHTML = '';
+  const list = state.view;
+  dom.empty.hidden = list.length > 0;
+  if (!list.length) return;
+
+  let i = 0;
+  const CHUNK = 48;
+  (function step() {
+    if (token !== renderToken) return;
+    const frag = document.createDocumentFragment();
+    const stop = Math.min(i + CHUNK, list.length);
+    for (; i < stop; i++) frag.appendChild(makeCard(list[i]));
+    dom.grid.appendChild(frag);
+    if (i < list.length) requestAnimationFrame(step);
+  })();
+}
+
+function onArtIntersect(entries) {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const card = entry.target;
+    state.artObserver.unobserve(card);
+    const id = card.dataset.id;
+    const holder = card.querySelector('.preview');
+    if (!holder || !id) return;
+    idbGet('art', id).then(rec => {
+      if (!rec || !rec.blob) return;
+      const url = URL.createObjectURL(rec.blob);
+      state.artUrls.set(id, url);
+      const img = document.createElement('img');
+      img.decoding = 'async';
+      img.alt = '';
+      img.src = url;
+      holder.innerHTML = '';
+      holder.classList.remove('generated');
+      holder.appendChild(img);
+    }).catch(() => {});
+  });
+}
+
+function makeCard(t) {
+  const card = document.createElement('article');
+  card.className = 'card' + (t.id === state.currentId ? ' active' : '');
+  card.dataset.id = t.id;
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.setAttribute('aria-label', (t.title || t.name) + ' by ' + (t.artist || 'Unknown artist'));
+
+  const preview = document.createElement('div');
+  preview.className = 'preview';
+
+  if (t.hasArt && state.artObserver) {
+    preview.classList.add('generated');
+    preview.innerHTML = '<div class="bars"><i style="height:38%"></i><i style="height:62%"></i><i style="height:46%"></i><i style="height:74%"></i><i style="height:52%"></i></div>';
+    state.artObserver.observe(card);
+  } else {
+    const hue = 330 + (hashStr(t.id) % 40);
+    preview.classList.add('generated');
+    preview.style.setProperty('--h', hue);
+    const bars = document.createElement('div');
+    bars.className = 'bars';
+    for (let k = 0; k < 5; k++) {
+      const bar = document.createElement('i');
+      bar.style.height = (26 + (hashStr(t.id + k) % 58)) + '%';
+      bars.appendChild(bar);
+    }
+    preview.appendChild(bars);
+  }
+
+  const info = document.createElement('div');
+  info.className = 'card-info';
+
+  const h3 = document.createElement('h3');
+  h3.textContent = t.title || t.name;
+
+  const small = document.createElement('small');
+  small.textContent = (t.artist || 'Unknown artist') + (t.album ? ' · ' + t.album : '');
+
+  const tag = document.createElement('span');
+  tag.className = 'tag';
+  tag.textContent = (t.duration ? fmtTime(t.duration) : '--:--') + ' · ' + fmtSize(t.size);
+
+  info.appendChild(h3);
+  info.appendChild(small);
+  info.appendChild(tag);
+
+  const actions = document.createElement('div');
+  actions.className = 'card-actions';
+
+  const fav = document.createElement('button');
+  fav.className = 'card-act fav' + (t.favorite ? ' on' : '');
+  fav.setAttribute('aria-label', 'Toggle favourite');
+  fav.innerHTML = '<svg class="ic"><use href="#i-heart"/></svg>';
+
+  const del = document.createElement('button');
+  del.className = 'card-act del';
+  del.setAttribute('aria-label', 'Remove from library');
+  del.innerHTML = '<svg class="ic"><use href="#i-trash"/></svg>';
+
+  actions.appendChild(fav);
+  actions.appendChild(del);
+
+  card.appendChild(preview);
+  card.appendChild(info);
+  card.appendChild(actions);
+
+  card.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playFromLibrary(t.id); }
+  });
+
+  return card;
+}
+
+function markActiveCard() {
+  $$('.card', dom.grid).forEach(c => c.classList.toggle('active', c.dataset.id === state.currentId));
+}
+
+function updateVaultMeta() {
+  const total = state.tracks.reduce((a, t) => a + (t.size || 0), 0);
+  const shown = state.view.length;
+  dom.vaultCount.textContent = shown === state.tracks.length
+    ? state.tracks.length + ' track' + (state.tracks.length === 1 ? '' : 's') + ' · ' + fmtSize(total)
+    : shown + ' of ' + state.tracks.length + ' tracks · ' + fmtSize(total);
+}
+
+/* ============================================================
+   IMPORT
+   ============================================================ */
+const AUDIO_RE = /\.(mp3|m4a|m4b|aac|wav|wave|flac|ogg|oga|opus|aif|aiff|weba)$/i;
+const isAudio = f => (f.type && f.type.indexOf('audio/') === 0) || AUDIO_RE.test(f.name || '');
+
+async function importFiles(fileList) {
+  if (state.importing) { toast('An import is already running.'); return; }
+
+  const files = Array.prototype.slice.call(fileList).filter(isAudio);
+  if (!files.length) { toast('No supported audio files found.'); return; }
+
+  state.importing = true;
+  setStatus('importing');
+  showToast('Importing 0 / ' + files.length, 0);
+
+  // Silently ask for durable storage on first import.
+  try {
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  } catch (e) {}
+
+  let done = 0;
+  let failed = 0;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    try {
+      const id = uid();
+      let tags = null;
+      try {
+        const headBuf = await file.slice(0, Math.min(file.size, 768 * 1024)).arrayBuffer();
+        tags = parseID3(headBuf);
+      } catch (e) { tags = null; }
+
+      const fallback = parseName(file.name);
+      const duration = await probeDuration(file);
+
+      const rec = {
+        id: id,
+        name: file.name,
+        title: (tags && tags.title) || fallback.title || file.name,
+        artist: (tags && tags.artist) || fallback.artist || 'Unknown artist',
+        album: (tags && tags.album) || '',
+        size: file.size,
+        type: file.type || 'audio/mpeg',
+        duration: duration,
+        added: Date.now(),
+        favorite: false,
+        hasArt: !!(tags && tags.art)
+      };
+
+      await idbPut('meta', rec);
+      await idbPut('blobs', { id: id, blob: file });
+      if (tags && tags.art) await idbPut('art', { id: id, blob: tags.art });
+
+      state.tracks.push(rec);
+    } catch (e) {
+      failed++;
+      console.warn('Import failed:', file.name, e);
+    }
+
+    done++;
+    showToast('Importing ' + done + ' / ' + files.length, (done / files.length) * 100);
+    await tick();
+  }
+
+  state.importing = false;
+  hideToast();
+  refresh();
+  setStatus(state.currentId ? 'paused' : 'idle');
+
+  const ok = done - failed;
+  toast(failed
+    ? ok + ' imported · ' + failed + ' skipped'
+    : ok + ' track' + (ok === 1 ? '' : 's') + ' added to the vault');
+}
+
+/* ============================================================
+   REMOVE / FAVOURITE
+   ============================================================ */
+async function removeTrack(id) {
+  const meta = state.tracks.find(t => t.id === id);
+  if (!meta) return;
+  if (!confirm('Remove "' + (meta.title || meta.name) + '" from this device?')) return;
+
+  await Promise.all([
+    idbDel('meta', id).catch(() => {}),
+    idbDel('blobs', id).catch(() => {}),
+    idbDel('art', id).catch(() => {})
+  ]);
+
+  state.tracks = state.tracks.filter(t => t.id !== id);
+  state.queue = state.queue.filter(x => x !== id);
+
+  if (state.currentId === id) {
+    audio.pause();
+    audio.removeAttribute('src');
+    if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
+    state.currentId = null;
+    updateNowPlaying(null);
+    setPlayIcon(false);
+    setStatus('idle');
+  }
+
+  const cached = state.artUrls.get(id);
+  if (cached) { URL.revokeObjectURL(cached); state.artUrls.delete(id); }
+
+  refresh();
+}
+
+async function toggleFavourite(id) {
+  const t = state.tracks.find(x => x.id === id);
+  if (!t) return;
+  t.favorite = !t.favorite;
+  try { await idbPut('meta', t); } catch (e) {}
+  refresh();
+}
+
+/* ============================================================
+   STORAGE
+   ============================================================ */
+async function updateStorage() {
+  let usage = 0, quota = 0;
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      usage = est.usage || 0;
+      quota = est.quota || 0;
+    }
+  } catch (e) {}
+  const total = state.tracks.reduce((a, t) => a + (t.size || 0), 0);
+  const pct = quota ? clamp((usage / quota) * 100, 0, 100) : 0;
+  dom.storageFill.style.width = (quota ? pct : Math.min(100, total / (1024 * 1024 * 50) * 100)) + '%';
+  dom.storageText.textContent = quota
+    ? fmtSize(total) + ' library · ' + fmtSize(usage) + ' of ' + fmtSize(quota) + ' used'
+    : fmtSize(total) + ' library';
+}
+
+async function checkPersist() {
+  if (!navigator.storage || !navigator.storage.persisted) return;
+  try {
+    const granted = await navigator.storage.persisted();
+    dom.persistDesc.textContent = granted
+      ? 'Granted — the library is protected from automatic cleanup.'
+      : 'Ask the browser to protect the library from cleanup.';
+  } catch (e) {}
+}
+
+async function requestPersist() {
+  if (!navigator.storage || !navigator.storage.persist) {
+    toast('Persistent storage is not supported in this browser.');
+    return;
+  }
+  let granted = false;
+  try {
+    granted = (navigator.storage.persisted && await navigator.storage.persisted()) || await navigator.storage.persist();
+  } catch (e) {}
+  dom.persistDesc.textContent = granted
+    ? 'Granted — the library is protected from automatic cleanup.'
+    : 'Not granted. The browser may clear the library under storage pressure.';
+  toast(granted ? 'Persistent storage granted.' : 'Persistent storage was not granted.');
+}
+
+async function clearLibrary() {
+  if (!state.tracks.length) { toast('The vault is already empty.'); return; }
+  if (!confirm('Erase all ' + state.tracks.length + ' tracks from this browser? This cannot be undone.')) return;
+
+  audio.pause();
+  audio.removeAttribute('src');
+  if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
+
+  try {
+    await Promise.all([idbClear('meta'), idbClear('blobs'), idbClear('art')]);
+  } catch (e) {}
+
+  state.artUrls.forEach(u => { if (u) URL.revokeObjectURL(u); });
+  state.artUrls.clear();
+  state.tracks = [];
+  state.view = [];
+  state.queue = [];
+  state.currentId = null;
+
+  updateNowPlaying(null);
+  setPlayIcon(false);
+  setStatus('idle');
+  refresh();
+  toast('Library erased.');
+}
+
+/* ============================================================
+   TOAST / DROPZONE
+   ============================================================ */
+let toastTimer = null;
+function showToast(text, pct) {
+  dom.toastText.textContent = text;
+  if (typeof pct === 'number') {
+    dom.toastBar.style.display = 'block';
+    dom.toastFill.style.width = clamp(pct, 0, 100) + '%';
+  } else {
+    dom.toastBar.style.display = 'none';
+  }
+  dom.toast.classList.add('show');
+  clearTimeout(toastTimer);
+}
+function hideToast(delay) {
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => dom.toast.classList.remove('show'), delay || 0);
+}
+function toast(text) {
+  showToast(text);
+  hideToast(2600);
+}
+
+/* ============================================================
+   LIBRARY / VAULT UI
+   ============================================================ */
+function openVault() {
+  dom.vault.classList.add('open');
+  dom.vault.setAttribute('aria-hidden', 'false');
+  $('#railLibrary').classList.add('on');
+  refresh();
+}
+function closeVault() {
+  dom.vault.classList.remove('open');
+  dom.vault.setAttribute('aria-hidden', 'true');
+}
+function openSettings() {
+  dom.settings.classList.add('open');
+  dom.settings.setAttribute('aria-hidden', 'false');
+  updateStorage();
+}
+function closeSettings() {
+  dom.settings.classList.remove('open');
+  dom.settings.setAttribute('aria-hidden', 'true');
+}
+
+function playFromLibrary(id) {
+  buildQueue(id);
+  playTrack(id, true);
+}
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+function bindUI() {
+
+  /* --- transport --- */
+  dom.dockPlay.addEventListener('click', () => {
+    if (!state.currentId) {
+      if (state.view.length || state.tracks.length) {
+        buildQueue();
+        playTrack(state.queue[0], true);
+      } else {
+        openVault();
+      }
+      return;
+    }
+    if (audio.paused) audio.play().catch(() => {}); else audio.pause();
+  });
+
+  dom.dockPrev.addEventListener('click', () => {
+    if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+    playNext(-1);
+  });
+  dom.dockNext.addEventListener('click', () => playNext(1));
+
+  /* --- seek --- */
+  dom.seek.addEventListener('pointerdown', () => { scrubbing = true; });
+  dom.seek.addEventListener('input', () => {
+    scrubbing = true;
+    const dur = isFinite(audio.duration) ? audio.duration : 0;
+    const t = (dom.seek.value / 1000) * dur;
+    dom.timeNow.textContent = fmtTime(t);
+    paintRange(dom.seek, (dom.seek.value / 1000) * 100);
+  });
+  const commitSeek = () => {
+    const dur = isFinite(audio.duration) ? audio.duration : 0;
+    if (dur) audio.currentTime = (dom.seek.value / 1000) * dur;
+    scrubbing = false;
+  };
+  dom.seek.addEventListener('change', commitSeek);
+  window.addEventListener('pointerup', () => { if (scrubbing) commitSeek(); });
+
+  /* --- volume --- */
+  dom.volume.addEventListener('input', () => {
+    settings.volume = parseFloat(dom.volume.value);
+    audio.volume = settings.volume;
+    paintRange(dom.volume, settings.volume * 100);
+    saveSettings();
+  });
+
+  /* --- rail --- */
+  $('#railLibrary').addEventListener('click', () => {
+    if (dom.vault.classList.contains('open')) closeVault(); else openVault();
+  });
+  $('#railImport').addEventListener('click', () => dom.fileInput.click());
+  $('#railSettings').addEventListener('click', openSettings);
+  $('#railFocus').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.body.classList.add('cinema');
+    dom.vault.classList.remove('open');
+    closeSettings();
+    setTimeout(() => {
+      const exit = () => {
+        document.body.classList.remove('cinema');
+        document.removeEventListener('pointerdown', exit);
+      };
+      document.addEventListener('pointerdown', exit);
+    }, 350);
+  });
+
+  dom.railShuffle.addEventListener('click', () => {
+    settings.shuffle = !settings.shuffle;
+    saveSettings();
+    syncShuffleUI();
+    flashSaved();
+  });
+
+  dom.railRepeat.addEventListener('click', () => {
+    const order = ['off', 'all', 'one'];
+    settings.repeat = order[(order.indexOf(settings.repeat) + 1) % order.length];
+    saveSettings();
+    syncRepeatUI();
+    flashSaved();
+    toast('Repeat: ' + settings.repeat);
+  });
+
+  /* --- vault --- */
+  $('#btnCloseVault').addEventListener('click', closeVault);
+  $('#btnImport').addEventListener('click', () => dom.fileInput.click());
+  $('#btnClear').addEventListener('click', clearLibrary);
+  $('#btnPersist').addEventListener('click', requestPersist);
+
+  dom.search.addEventListener('input', () => {
+    state.query = dom.search.value;
+    refresh();
+  });
+
+  dom.filters.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-filter]');
+    if (!btn) return;
+    $$('#filters button').forEach(b => b.classList.toggle('active', b === btn));
+    state.filter = btn.dataset.filter;
+    refresh();
+  });
+
+  dom.grid.addEventListener('click', e => {
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const id = card.dataset.id;
+    const act = e.target.closest('.card-act');
+    if (act) {
+      e.stopPropagation();
+      if (act.classList.contains('fav')) toggleFavourite(id);
+      else removeTrack(id);
+      return;
+    }
+    playFromLibrary(id);
+  });
+
+  /* --- settings panel --- */
+  $('#btnCloseSettings').addEventListener('click', closeSettings);
+  $('#btnDoneSettings').addEventListener('click', closeSettings);
+  dom.settings.addEventListener('click', e => {
+    if (e.target === dom.settings) closeSettings();
+  });
+
+  bindSwitch($('#setAutoplay'), 'autoplay');
+  bindSwitch($('#setShuffle'), 'shuffle', syncShuffleUI);
+  bindSwitch($('#setScene'), 'scene', () => {
+    document.body.classList.toggle('no-scene', !settings.scene);
+  });
+  bindSwitch($('#setCardHover'), 'cardHover', () => {
+    document.body.classList.toggle('card-hover', !!settings.cardHover);
+  });
+  bindSwitch($('#setReduceMotion'), 'reduceMotion', () => {
+    document.body.classList.toggle('reduce-motion', !!settings.reduceMotion);
+  });
+  bindSwitch($('#setContrast'), 'highContrast', () => {
+    document.body.classList.toggle('high-contrast', !!settings.highContrast);
+  });
+
+  $('#setRepeat').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-repeat]');
+    if (!btn) return;
+    settings.repeat = btn.dataset.repeat;
+    saveSettings();
+    syncRepeatUI();
+    flashSaved();
+  });
+
+  const speed = $('#setSpeed');
+  const speedVal = $('#setSpeedVal');
+  speed.value = String(settings.speed);
+  speedVal.textContent = settings.speed.toFixed(2) + '×';
+  paintRange(speed, ((settings.speed - 0.5) / 1.5) * 100);
+  speed.addEventListener('input', () => {
+    settings.speed = parseFloat(speed.value);
+    audio.playbackRate = settings.speed;
+    speedVal.textContent = settings.speed.toFixed(2) + '×';
+    paintRange(speed, ((settings.speed - 0.5) / 1.5) * 100);
+    saveSettings();
+  });
+
+  $('#setPersist').addEventListener('click', requestPersist);
+  $('#setClear').addEventListener('click', clearLibrary);
+
+  /* --- file input --- */
+  dom.fileInput.addEventListener('change', () => {
+    const files = dom.fileInput.files;
+    dom.fileInput.value = '';
+    if (files && files.length) importFiles(files);
+  });
+
+  /* --- drag & drop --- */
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => {
+    e.preventDefault();
+    dragDepth++;
+    dom.dropzone.classList.add('show');
+  });
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('dragleave', e => {
+    e.preventDefault();
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) dom.dropzone.classList.remove('show');
+  });
+  window.addEventListener('drop', e => {
+    e.preventDefault();
+    dragDepth = 0;
+    dom.dropzone.classList.remove('show');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      importFiles(e.dataTransfer.files);
+    }
+  });
+
+  /* --- keyboard --- */
+  window.addEventListener('keydown', e => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (state.currentId) { if (audio.paused) audio.play().catch(() => {}); else audio.pause(); }
+    } else if (e.code === 'ArrowRight' && e.shiftKey) {
+      playNext(1);
+    } else if (e.code === 'ArrowLeft' && e.shiftKey) {
+      playNext(-1);
+    } else if (e.key === 'Escape') {
+      closeVault(); closeSettings();
+      document.body.classList.remove('cinema');
+    } else if (e.key === 'c' || e.key === 'C') {
+      document.body.classList.toggle('cinema');
+    }
+  });
+
+  /* --- media session --- */
+  if ('mediaSession' in navigator) {
+    try {
+      navigator.mediaSession.setActionHandler('play', () => audio.play().catch(() => {}));
+      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      navigator.mediaSession.setActionHandler('previoustrack', () => playNext(-1));
+      navigator.mediaSession.setActionHandler('nexttrack', () => playNext(1));
+    } catch (e) {}
+  }
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+async function init() {
+  applySettings();
+
+  try {
+    db = await openDB();
+    state.tracks = await idbAll('meta');
+  } catch (e) {
+    console.warn('IndexedDB unavailable', e);
+    db = null;
+    toast('Local storage is unavailable — imports will not persist.');
+  }
+
+  bindUI();
+  refresh();
+  updateStorage();
+  checkPersist();
+  setStatus('idle');
+  setPlayIcon(false);
+  updateNowPlaying(null);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+})();
+</script>
 </body>
 </html>
