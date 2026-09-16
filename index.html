@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Sharpness of Being</title>
+    <title>Between Worlds</title>
     <style>
         body, html {
             margin: 0;
@@ -11,398 +11,380 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #0d0909;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            touch-action: none; /* Prevents iPad scrolling */
+            background-color: #000;
+            touch-action: none; /* Crucial for iPad */
+            user-select: none;
         }
         canvas {
             display: block;
             width: 100%;
             height: 100%;
         }
-        #text-overlay {
+        #ui-layer {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80%;
-            max-width: 600px;
+            bottom: 10%;
+            left: 0;
+            width: 100%;
             text-align: center;
-            color: rgba(255, 255, 255, 0.85);
-            font-size: 1.2rem;
-            line-height: 1.8;
-            letter-spacing: 2px;
             pointer-events: none;
-            opacity: 0;
-            transition: opacity 2s ease-in-out;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.5);
-            font-weight: 300;
-        }
-        .chapter-title {
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 4px;
-            color: rgba(255, 255, 255, 0.4);
-            margin-bottom: 20px;
-            display: block;
+            color: white;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 24px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            transition: opacity 1s ease-in-out;
+            padding: 0 20px;
+            box-sizing: border-box;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas"></canvas>
-    <div id="text-overlay">
-        <span class="chapter-title" id="chapter-title"></span>
-        <span id="story-text"></span>
-    </div>
 
-    <script src="models.js"></script>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui-layer"></div>
+
+    <!-- Load the Assets file first -->
+    <script src="assets.js"></script>
+    
+    <!-- The Game Engine -->
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const textOverlay = document.getElementById('text-overlay');
-        const chapterTitle = document.getElementById('chapter-title');
-        const storyText = document.getElementById('story-text');
+        const uiLayer = document.getElementById('ui-layer');
 
         let width, height;
-        let dpr = window.devicePixelRatio || 1;
+        let cameraX = 0;
+        let currentChapter = 0;
+        let activeParagraph = null;
+        let textAlpha = 0;
+        let textState = 'fadein'; // fadein, hold, fadeout
 
+        // Input state
+        let input = { left: false, right: false };
+
+        // Player state
+        const player = {
+            x: 100,
+            y: 0,
+            vx: 0,
+            width: 10,
+            height: 30,
+            bobble: 0
+        };
+
+        // Particles for atmosphere (bokeh/dust)
+        const particles = [];
+        for(let i=0; i<50; i++) {
+            particles.push({
+                x: Math.random() * 3000,
+                y: Math.random() * 1000,
+                size: Math.random() * 4 + 1,
+                speed: Math.random() * 0.5 + 0.1
+            });
+        }
+
+        // --- SETUP & RESIZE ---
         function resize() {
+            const dpr = window.devicePixelRatio || 1;
             width = window.innerWidth;
             height = window.innerHeight;
             canvas.width = width * dpr;
             canvas.height = height * dpr;
             ctx.scale(dpr, dpr);
-            canvas.style.width = width + 'px';
-            canvas.style.height = height + 'px';
+            
+            // Set player base Y position to 80% of screen
+            player.y = height * 0.8; 
         }
         window.addEventListener('resize', resize);
         resize();
 
-        // Audio Context for procedural ambient sound
-        let audioCtx;
-        let droneOsc;
-        let droneGain;
-
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                
-                // Deep, sad drone
-                droneOsc = audioCtx.createOscillator();
-                droneGain = audioCtx.createGain();
-                droneOsc.type = 'sine';
-                droneOsc.frequency.setValueAtTime(55, audioCtx.currentTime); // A1
-                
-                const lfo = audioCtx.createOscillator();
-                const lfoGain = audioCtx.createGain();
-                lfo.type = 'sine';
-                lfo.frequency.setValueAtTime(0.1, audioCtx.currentTime); // Very slow pulse
-                lfoGain.gain.setValueAtTime(2, audioCtx.currentTime);
-                
-                lfo.connect(lfoGain);
-                lfoGain.connect(droneOsc.frequency);
-                
-                droneOsc.connect(droneGain);
-                droneGain.connect(audioCtx.destination);
-                
-                droneGain.gain.setValueAtTime(0.05, audioCtx.currentTime); // Very quiet
-                
-                droneOsc.start();
-                lfo.start();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-        }
-
-        // Game State
-        const game = {
-            state: 'title', // title, playing, transitioning
-            chapter: 0,
-            transitionAlpha: 0,
-            targetAlpha: 0,
-            transitionDirection: 0, // -1 fade out, 1 fade in
-            transitionCallback: null
-        };
-
-        // Entities
-        let sharp, soft, environment;
-        let particles = [];
-        let camera = { x: 0, y: 0, scale: 1, targetX: 0, targetY: 0, targetScale: 1 };
-
-        // Input handling
-        let isDragging = false;
-        let dragOffset = { x: 0, y: 0 };
-        let touchStart = { x: 0, y: 0 };
-
-        function getPointerPos(e) {
-            const rect = canvas.getBoundingClientRect();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            return {
-                x: (clientX - rect.left) - camera.x,
-                y: (clientY - rect.top) - camera.y
-            };
-        }
-
-        function handleStart(e) {
-            initAudio();
-            if (game.state === 'title') {
-                startChapter(1);
-                return;
-            }
-            const pos = getPointerPos(e);
-            // Check if touching near the sharp entity
-            const dist = Math.hypot(pos.x - sharp.pos.x, pos.y - sharp.pos.y);
-            if (dist < 150 * camera.scale) {
-                isDragging = true;
-                dragOffset.x = sharp.pos.x - pos.x;
-                dragOffset.y = sharp.pos.y - pos.y;
-            }
-        }
-
-        function handleMove(e) {
-            if (!isDragging || game.state !== 'playing') return;
+        // --- INPUT HANDLING (iPAD OPTIMIZED) ---
+        function handleTouchStart(e) {
             e.preventDefault();
-            const pos = getPointerPos(e);
-            sharp.targetPos.x = pos.x + dragOffset.x;
-            sharp.targetPos.y = pos.y + dragOffset.y;
+            const touchX = e.touches[0].clientX;
+            if (touchX < width / 2) input.left = true;
+            else input.right = true;
         }
 
-        function handleEnd() {
-            isDragging = false;
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            input.left = false;
+            input.right = false;
         }
 
-        canvas.addEventListener('mousedown', handleStart);
-        canvas.addEventListener('mousemove', handleMove);
-        canvas.addEventListener('mouseup', handleEnd);
-        canvas.addEventListener('touchstart', handleStart, { passive: false });
-        canvas.addEventListener('touchmove', handleMove, { passive: false });
-        canvas.addEventListener('touchend', handleEnd);
-
-        // Story Engine
-        const storyData = [
-            {
-                title: "I. The Edge",
-                text: "I was born with edges. I didn't know they cut.",
-                setup: () => {
-                    sharp = new SharpShape(width/2, height/2 + 100);
-                    environment = new Environment(width, height, 0);
-                    camera.targetScale = 1;
-                    camera.targetX = -width/2 + width/2; // Center
-                    camera.targetY = -height/2 + height/2;
-                    textOverlay.style.color = 'rgba(255, 255, 255, 0.6)';
-                },
-                update: (dt) => {
-                    // Sharp just floats
-                }
-            },
-            {
-                title: "II. The Warmth",
-                text: "I found warmth. I reached out. The warmth bled.",
-                setup: () => {
-                    soft = new SoftShape(width/2, height/2 - 50, 'circle');
-                    environment = new Environment(width, height, 1);
-                    camera.targetScale = 1.5;
-                    camera.targetX = -width/2 + width/2;
-                    camera.targetY = -height/2 + height/2;
-                    textOverlay.style.color = 'rgba(255, 200, 200, 0.8)';
-                },
-                update: (dt) => {
-                    soft.update(dt);
-                    // Check collision
-                    const dist = Math.hypot(sharp.pos.x - soft.pos.x, sharp.pos.y - soft.pos.y);
-                    if (dist < 80) {
-                        triggerShatter(soft);
-                        soft = null;
-                        game.transitionCallback = () => startChapter(3);
-                    }
-                }
-            },
-            {
-                title: "III. The Distance",
-                text: "So I built walls of distance. The further I am, the safer you are.",
-                setup: () => {
-                    sharp = new SharpShape(width/2, height - 100);
-                    environment = new Environment(width, height, 2);
-                    camera.targetScale = 0.8;
-                    camera.targetX = -width/2 + width/2;
-                    camera.targetY = -height/2 + height/2;
-                    textOverlay.style.color = 'rgba(150, 150, 200, 0.6)';
-                },
-                update: (dt) => {
-                    // Sharp retreats
-                }
-            },
-            {
-                title: "IV. The Cruel Gravity",
-                text: "But even the cosmos pushes. A cruel gravity. I am sorry.",
-                setup: () => {
-                    sharp = new SharpShape(width/2 - 200, height/2);
-                    soft = new SoftShape(width/2 + 200, height/2, 'ribbon');
-                    environment = new Environment(width, height, 3);
-                    camera.targetScale = 1.2;
-                    camera.targetX = -width/2 + width/2;
-                    camera.targetY = -height/2 + height/2;
-                    textOverlay.style.color = 'rgba(255, 180, 180, 0.8)';
-                },
-                update: (dt) => {
-                    soft.update(dt);
-                    // Environmental push - they are drawn together
-                    const dx = soft.pos.x - sharp.pos.x;
-                    const dy = soft.pos.y - sharp.pos.y;
-                    const dist = Math.hypot(dx, dy);
-                    
-                    // Cruel gravity pulls them together
-                    sharp.pos.x += (dx / dist) * 20 * dt;
-                    sharp.pos.y += (dy / dist) * 20 * dt;
-                    sharp.targetPos.x = sharp.pos.x;
-                    sharp.targetPos.y = sharp.pos.y;
-
-                    if (dist < 80) {
-                        triggerShatter(soft);
-                        soft = null;
-                        game.transitionCallback = () => startChapter(5);
-                    }
-                }
-            },
-            {
-                title: "V. The Vastness",
-                text: "I am the sharpness in the dark. And I love you from afar.",
-                setup: () => {
-                    sharp = new SharpShape(width/2, height - 150);
-                    soft = new SoftShape(width/2, height/2 - 200, 'distant');
-                    environment = new Environment(width, height, 4);
-                    camera.targetScale = 0.6;
-                    camera.targetX = -width/2 + width/2;
-                    camera.targetY = -height/2 + height/2 + 100;
-                    textOverlay.style.color = 'rgba(255, 200, 200, 0.5)';
-                },
-                update: (dt) => {
-                    soft.update(dt);
-                    // Sharp is frozen, watching
-                }
-            }
-        ];
-
-        function startChapter(num) {
-            game.state = 'transitioning';
-            game.chapter = num;
-            game.transitionDirection = 1; // Fade in
-            game.targetAlpha = 1;
-            
-            if (num <= storyData.length) {
-                const chapter = storyData[num - 1];
-                chapterTitle.innerText = chapter.title;
-                storyText.innerText = chapter.text;
-                chapter.setup();
-                particles = [];
-            }
-        }
-
-        function triggerShatter(entity) {
-            // Create particles
-            for (let i = 0; i < 100; i++) {
-                particles.push(new Particle(entity.pos.x, entity.pos.y, entity.color));
-            }
-            // Audio shatter
-            if (audioCtx) {
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.5);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.5);
-            }
-            game.state = 'transitioning';
-            game.transitionDirection = -1; // Fade out
-            game.targetAlpha = 0;
-        }
-
-        // Main Loop
-        let lastTime = performance.now();
+        // Mouse fallback for desktop testing
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+        canvas.addEventListener('touchcancel', handleTouchEnd, { passive: false });
         
-        function loop(time) {
-            const dt = Math.min((time - lastTime) / 1000, 0.1); // Cap dt
-            lastTime = time;
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.clientX < width / 2) input.left = true;
+            else input.right = true;
+        });
+        canvas.addEventListener('mouseup', () => { input.left = false; input.right = false; });
+        canvas.addEventListener('mouseleave', () => { input.left = false; input.right = false; });
 
-            // Update
-            if (game.state === 'playing' || game.state === 'transitioning') {
-                const currentChapter = storyData[game.chapter - 1];
-                if (currentChapter && currentChapter.update) {
-                    currentChapter.update(dt);
-                }
+        // --- GAME LOGIC ---
+        function update() {
+            // Player Movement
+            if (input.left) player.vx = -GAME_ASSETS.config.walkSpeed;
+            else if (input.right) player.vx = GAME_ASSETS.config.walkSpeed;
+            else player.vx = 0;
 
-                if (sharp) sharp.update(dt, camera);
-                if (environment) environment.update(dt);
-                
-                particles.forEach((p, index) => {
-                    p.update(dt);
-                    if (p.life <= 0) particles.splice(index, 1);
-                });
-
-                // Camera easing
-                camera.x += (camera.targetX - camera.x) * 5 * dt;
-                camera.y += (camera.targetY - camera.y) * 5 * dt;
-                camera.scale += (camera.targetScale - camera.scale) * 3 * dt;
-            }
-
-            // Transition logic
-            if (game.state === 'transitioning') {
-                if (game.transitionDirection === 1) {
-                    game.transitionAlpha += dt * 0.5;
-                    if (game.transitionAlpha >= 1) {
-                        game.transitionAlpha = 1;
-                        game.state = 'playing';
-                    }
-                } else {
-                    game.transitionAlpha -= dt * 0.5;
-                    if (game.transitionAlpha <= 0) {
-                        game.transitionAlpha = 0;
-                        if (game.transitionCallback) {
-                            const cb = game.transitionCallback;
-                            game.transitionCallback = null;
-                            cb();
-                        }
-                    }
-                }
-                
-                // Update text overlay opacity
-                textOverlay.style.opacity = game.transitionAlpha;
-            }
-
-            // Render
-            ctx.clearRect(0, 0, width, height);
+            player.x += player.vx;
             
+            // Boundaries
+            if (player.x < 0) player.x = 0;
+            if (player.x > GAME_ASSETS.config.totalWorldWidth) player.x = GAME_ASSETS.config.totalWorldWidth;
+
+            // Walking bobble animation
+            if (player.vx !== 0) player.bobble += 0.2;
+            else player.bobble = 0;
+
+            // Camera follow (keeps player roughly 1/3 from the left)
+            let targetCamX = player.x - width / 3;
+            if (targetCamX < 0) targetCamX = 0;
+            // Smooth camera
+            cameraX += (targetCamX - cameraX) * 0.1;
+
+            // Determine current chapter based on player X
+            const chapter = GAME_ASSETS.chapters.find(c => player.x >= c.startX && player.x <= c.endX) || GAME_ASSETS.chapters[GAME_ASSETS.chapters.length - 1];
+            currentChapter = chapter.id;
+
+            // Text Trigger Logic
+            let newParagraph = null;
+            for (let p of chapter.paragraphs) {
+                if (player.x > p.x && !p.triggered) {
+                    newParagraph = p;
+                    p.triggered = true;
+                    break; // Only trigger one at a time
+                }
+            }
+
+            if (newParagraph) {
+                activeParagraph = newParagraph;
+                textState = 'fadein';
+                textAlpha = 0;
+                uiLayer.innerText = activeParagraph.text;
+                uiLayer.style.opacity = 0;
+            }
+
+            // Text fade logic
+            if (activeParagraph) {
+                if (textState === 'fadein') {
+                    textAlpha += 0.02;
+                    if (textAlpha >= 1) { textAlpha = 1; textState = 'hold'; }
+                } else if (textState === 'hold') {
+                    // Add a delay before fading out (simulated by frames)
+                    if (!activeParagraph.holdTimer) activeParagraph.holdTimer = 0;
+                    activeParagraph.holdTimer++;
+                    if (activeParagraph.holdTimer > 180) { // ~3 seconds at 60fps
+                        textState = 'fadeout';
+                    }
+                } else if (textState === 'fadeout') {
+                    textAlpha -= 0.02;
+                    if (textAlpha <= 0) {
+                        textAlpha = 0;
+                        activeParagraph = null;
+                    }
+                }
+                uiLayer.style.opacity = textAlpha;
+            }
+
+            // Update particles
+            particles.forEach(p => {
+                p.y -= p.speed;
+                if (p.y < 0) p.y = height;
+            });
+        }
+
+        // --- RENDERING ---
+        function draw() {
+            const palette = GAME_ASSETS.chapters[currentChapter].palette;
+
+            // 1. Sky Background
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+            skyGrad.addColorStop(0, palette.skyTop);
+            skyGrad.addColorStop(1, palette.skyBottom);
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            // 2. Far Parallax Layer (Giant Hands & Celestial bodies)
             ctx.save();
-            ctx.translate(camera.x, camera.y);
-            ctx.scale(camera.scale, camera.scale);
-
-            if (environment) environment.draw(ctx);
-            
-            particles.forEach(p => p.draw(ctx));
-
-            if (soft && game.state !== 'transitioning') soft.draw(ctx);
-            if (sharp) sharp.draw(ctx);
-
+            ctx.translate(-cameraX * GAME_ASSETS.config.parallaxFar, 0);
+            drawFarBackground(palette);
             ctx.restore();
 
-            // Draw transition veil
-            if (game.transitionAlpha > 0) {
-                ctx.fillStyle = `rgba(13, 9, 9, ${game.transitionAlpha * 0.7})`;
-                ctx.fillRect(0, 0, width, height);
+            // 3. Mid Parallax Layer (Trees, Vines, Stage structure)
+            ctx.save();
+            ctx.translate(-cameraX * GAME_ASSETS.config.parallaxMid, 0);
+            drawMidBackground(palette);
+            ctx.restore();
+
+            // 4. Particles / Fog overlay
+            ctx.fillStyle = palette.fog;
+            for(let p of particles) {
+                ctx.beginPath();
+                ctx.arc(p.x - (cameraX * 0.8), p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
             }
 
-            requestAnimationFrame(loop);
+            // 5. Near Parallax Layer (Ground)
+            ctx.save();
+            ctx.translate(-cameraX * GAME_ASSETS.config.parallaxNear, 0);
+            drawNearBackground(palette);
+            ctx.restore();
+
+            // 6. Player Character
+            drawPlayer(palette);
         }
 
-        // Start
-        requestAnimationFrame(loop);
+        function drawFarBackground(palette) {
+            // Draw the giant ethereal hands from Image 1
+            ctx.fillStyle = 'rgba(150, 200, 200, 0.4)';
+            ctx.beginPath();
+            ctx.moveTo(800, 100);
+            ctx.bezierCurveTo(900, 300, 1200, 400, 1500, 300);
+            ctx.bezierCurveTo(1300, 200, 1000, 100, 800, 100);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(1200, 500);
+            ctx.bezierCurveTo(1000, 600, 800, 800, 900, 900);
+            ctx.bezierCurveTo(1100, 850, 1300, 700, 1200, 500);
+            ctx.fill();
+
+            // Draw the Dark ceiling shapes from Image 2
+            if (currentChapter === 1) {
+                ctx.fillStyle = '#0A0A10';
+                for(let i=0; i<5; i++) {
+                    ctx.beginPath();
+                    ctx.moveTo(1500 + i*400, 0);
+                    ctx.lineTo(1800 + i*400, 100);
+                    ctx.lineTo(1300 + i*400, 150);
+                    ctx.fill();
+                }
+            }
+        }
+
+        function drawMidBackground(palette) {
+            // Draw Vines (Image 1)
+            ctx.strokeStyle = palette.vine;
+            ctx.lineWidth = 15;
+            ctx.lineCap = 'round';
+            
+            ctx.beginPath();
+            ctx.moveTo(0, 200);
+            ctx.bezierCurveTo(300, 100, 500, 400, 800, 200);
+            ctx.stroke();
+
+            // Draw the Stage (Image 2)
+            if (currentChapter === 1) {
+                ctx.fillStyle = '#0A0A10';
+                // Stage base
+                ctx.fillRect(1800, height * 0.6, 1000, height * 0.4);
+                // Stage pillars
+                ctx.fillRect(2000, height * 0.4, 50, height * 0.2);
+                ctx.fillRect(2500, height * 0.4, 50, height * 0.2);
+
+                // Neon Lights
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = palette.accent;
+                ctx.fillStyle = palette.accent;
+                
+                // String lights
+                for(let i=0; i<10; i++) {
+                    ctx.beginPath();
+                    ctx.arc(1900 + i*80, height * 0.45 + Math.sin(i)*20, 4, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                
+                // Stage figure (singer)
+                ctx.fillStyle = palette.accent;
+                ctx.beginPath();
+                ctx.moveTo(2200, height * 0.6);
+                ctx.lineTo(2230, height * 0.4);
+                ctx.lineTo(2260, height * 0.6);
+                ctx.fill();
+
+                ctx.shadowBlur = 0; // Reset shadow
+            }
+        }
+
+        function drawNearBackground(palette) {
+            // Ground base
+            ctx.fillStyle = palette.ground;
+            ctx.beginPath();
+            ctx.moveTo(0, height * 0.8);
+            // Create uneven terrain
+            for(let i=0; i<GAME_ASSETS.config.totalWorldWidth; i+=200) {
+                ctx.lineTo(i, height * 0.8 + Math.sin(i * 0.01) * 20);
+            }
+            ctx.lineTo(GAME_ASSETS.config.totalWorldWidth, height);
+            ctx.lineTo(0, height);
+            ctx.fill();
+
+            // Foreground grass/vines details
+            ctx.strokeStyle = palette.vine;
+            ctx.lineWidth = 4;
+            for(let i=0; i<GAME_ASSETS.config.totalWorldWidth; i+=100) {
+                ctx.beginPath();
+                ctx.moveTo(i, height * 0.8 + Math.sin(i * 0.01) * 20);
+                ctx.quadraticCurveTo(
+                    i + 20, height * 0.75 + Math.sin(i * 0.01) * 20,
+                    i + 10, height * 0.7 + Math.sin(i * 0.01) * 20
+                );
+                ctx.stroke();
+            }
+        }
+
+        function drawPlayer(palette) {
+            // Position player on screen relative to camera
+            const screenX = player.x - cameraX;
+            // Apply bobble effect
+            const screenY = player.y + Math.sin(player.bobble) * 4;
+
+            ctx.save();
+            ctx.translate(screenX, screenY);
+
+            // Player shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, 10, 15, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Player body (The glowing figure)
+            ctx.fillStyle = palette.accent;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = palette.accent;
+            
+            // Draw a small cloak/dress shape
+            ctx.beginPath();
+            ctx.moveTo(-10, 10); // bottom left
+            ctx.lineTo(10, 10);  // bottom right
+            ctx.lineTo(5, -10);  // waist right
+            ctx.lineTo(5, -20);  // head right
+            ctx.lineTo(-5, -20); // head left
+            ctx.lineTo(-5, -10); // waist left
+            ctx.closePath();
+            ctx.fill();
+
+            // Head
+            ctx.beginPath();
+            ctx.arc(0, -25, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // --- GAME LOOP ---
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Start the game
+        gameLoop();
 
     </script>
 </body>
