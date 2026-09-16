@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#2a070d">
+<meta name="theme-color" content="#1a0508">
 <title>Resonance — Listening Room</title>
 <link rel="stylesheet" href="styles.css">
 </head>
@@ -325,12 +325,18 @@
 'use strict';
 
 /* ============================================================
-   HELPERS
+   TINY HELPERS
    ============================================================ */
 const $  = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const tick = () => new Promise(r => setTimeout(r, 0));
+const toArray = (list) => {
+  const out = [];
+  if (!list) return out;
+  for (let i = 0; i < list.length; i++) out.push(list[i]);
+  return out;
+};
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 const uid = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 function fmtTime(s) {
@@ -340,81 +346,142 @@ function fmtTime(s) {
   return m + ':' + (sec < 10 ? '0' : '') + sec;
 }
 function fmtSize(b) {
-  if (!b) return '0 B';
+  if (!b || b < 0) return '0 B';
   const u = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.min(u.length - 1, Math.floor(Math.log(b) / Math.log(1024)));
   return (b / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + u[i];
 }
 function hashStr(s) {
   let h = 2166136261;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
   return h >>> 0;
 }
 function loadJSON(key, fallback) {
-  try { const v = JSON.parse(localStorage.getItem(key)); return v == null ? fallback : v; }
-  catch (e) { return fallback; }
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    return (v == null) ? fallback : v;
+  } catch (e) { return fallback; }
 }
 
 /* ============================================================
-   INDEXEDDB — meta / blobs / art
+   INDEXEDDB
+   ------------------------------------------------------------
+   All helpers keep an explicit reference to the transaction so
+   it cannot be garbage-collected mid-flight (a known cause of
+   silent import failures in Safari).
    ============================================================ */
 const DB_NAME = 'resonance-db';
 const DB_VERSION = 1;
 let db = null;
+let dbReady = null;
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    if (!('indexedDB' in window)) {
+      reject(new Error('IndexedDB is not available in this browser.'));
+      return;
+    }
+    let settled = false;
+    const req = window.indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const d = req.result;
       if (!d.objectStoreNames.contains('meta'))  d.createObjectStore('meta',  { keyPath: 'id' });
       if (!d.objectStoreNames.contains('blobs')) d.createObjectStore('blobs', { keyPath: 'id' });
       if (!d.objectStoreNames.contains('art'))   d.createObjectStore('art',   { keyPath: 'id' });
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { if (!settled) { settled = true; resolve(req.result); } };
+    req.onerror   = () => { if (!settled) { settled = true; reject(req.error || new Error('IndexedDB open failed.')); } };
+    req.onblocked = () => { /* another tab holds an old version */ };
   });
 }
-const store = (n, m) => db.transaction(n, m).objectStore(n);
 
 function idbPut(name, val) {
-  return new Promise((res, rej) => {
-    const r = store(name, 'readwrite').put(val);
-    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  return new Promise((resolve, reject) => {
+    if (!db) { reject(new Error('Database unavailable.')); return; }
+    let tx;
+    try { tx = db.transaction(name, 'readwrite'); }
+    catch (e) { reject(e); return; }
+    const st = tx.objectStore(name);
+    let req;
+    try { req = st.put(val); }
+    catch (e) { reject(e); return; }
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error || new Error('Write failed.'));
+    tx.onabort    = () => reject(tx.error || new Error('Transaction aborted.'));
+    tx.onerror    = () => reject(tx.error || new Error('Transaction error.'));
   });
 }
+
 function idbGet(name, key) {
-  return new Promise((res, rej) => {
-    const r = store(name, 'readonly').get(key);
-    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  return new Promise((resolve, reject) => {
+    if (!db) { resolve(null); return; }
+    let tx;
+    try { tx = db.transaction(name, 'readonly'); }
+    catch (e) { reject(e); return; }
+    const st = tx.objectStore(name);
+    const req = st.get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror   = () => reject(req.error || new Error('Read failed.'));
   });
 }
+
 function idbDel(name, key) {
-  return new Promise((res, rej) => {
-    const r = store(name, 'readwrite').delete(key);
-    r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+  return new Promise((resolve, reject) => {
+    if (!db) { resolve(); return; }
+    let tx;
+    try { tx = db.transaction(name, 'readwrite'); }
+    catch (e) { reject(e); return; }
+    const st = tx.objectStore(name);
+    const req = st.delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error || new Error('Delete failed.'));
+    tx.onabort    = () => reject(tx.error || new Error('Transaction aborted.'));
   });
 }
+
 function idbAll(name) {
-  return new Promise((res, rej) => {
-    const r = store(name, 'readonly').getAll();
-    r.onsuccess = () => res(r.result || []); r.onerror = () => rej(r.error);
+  return new Promise((resolve, reject) => {
+    if (!db) { resolve([]); return; }
+    let tx;
+    try { tx = db.transaction(name, 'readonly'); }
+    catch (e) { reject(e); return; }
+    const st = tx.objectStore(name);
+    const req = st.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror   = () => reject(req.error || new Error('Read failed.'));
   });
 }
+
 function idbClear(name) {
-  return new Promise((res, rej) => {
-    const r = store(name, 'readwrite').clear();
-    r.onsuccess = () => res(); r.onerror = () => rej(r.error);
+  return new Promise((resolve, reject) => {
+    if (!db) { resolve(); return; }
+    let tx;
+    try { tx = db.transaction(name, 'readwrite'); }
+    catch (e) { reject(e); return; }
+    const st = tx.objectStore(name);
+    const req = st.clear();
+    req.onsuccess = () => resolve();
+    req.onerror   = () => reject(req.error || new Error('Clear failed.'));
   });
 }
 
 /* ============================================================
-   ID3v2 TAG READER (title / artist / album / cover)
+   ID3v2 TAG READER
    ============================================================ */
-const syncsafe = (b, o) => ((b[o] & 0x7f) << 21) | ((b[o + 1] & 0x7f) << 14) | ((b[o + 2] & 0x7f) << 7) | (b[o + 3] & 0x7f);
-const readU32  = (b, o) => ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
-const str3 = (b, o) => String.fromCharCode(b[o], b[o + 1], b[o + 2]);
-const str4 = (b, o) => String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]);
+function syncsafe(b, o) {
+  return ((b[o] & 0x7f) << 21) |
+         ((b[o + 1] & 0x7f) << 14) |
+         ((b[o + 2] & 0x7f) << 7) |
+          (b[o + 3] & 0x7f);
+}
+function readU32(b, o) {
+  return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+}
+function str3(b, o) { return String.fromCharCode(b[o], b[o + 1], b[o + 2]); }
+function str4(b, o) { return String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]); }
 
 function decodeText(bytes) {
   if (!bytes || bytes.length < 1) return '';
@@ -422,10 +489,10 @@ function decodeText(bytes) {
   const body = bytes.subarray(1);
   let out = '';
   try {
-    if (enc === 0) out = new TextDecoder('windows-1252').decode(body);
+    if (enc === 0)      out = new TextDecoder('windows-1252').decode(body);
     else if (enc === 1) out = new TextDecoder('utf-16').decode(body);
     else if (enc === 2) out = new TextDecoder('utf-16be').decode(body);
-    else out = new TextDecoder('utf-8').decode(body);
+    else                out = new TextDecoder('utf-8').decode(body);
   } catch (e) {
     try { out = new TextDecoder('utf-8').decode(body); } catch (e2) { out = ''; }
   }
@@ -433,6 +500,7 @@ function decodeText(bytes) {
 }
 
 function parseAPIC(d, v2) {
+  if (d.length < 6) return null;
   let p = 0;
   const enc = d[p++];
   let mime;
@@ -442,9 +510,11 @@ function parseAPIC(d, v2) {
   } else {
     const s = p;
     while (p < d.length && d[p] !== 0) p++;
+    if (p >= d.length) return null;
     mime = String.fromCharCode.apply(null, Array.prototype.slice.call(d.subarray(s, p))) || 'image/jpeg';
     p++;
   }
+  if (p >= d.length) return null;
   p++; // picture type
   if (enc === 1 || enc === 2) {
     while (p + 1 < d.length && !(d[p] === 0 && d[p + 1] === 0)) p += 2;
@@ -453,9 +523,12 @@ function parseAPIC(d, v2) {
     while (p < d.length && d[p] !== 0) p++;
     p++;
   }
+  if (p >= d.length) return null;
   const img = d.subarray(p);
   if (img.length < 256) return null;
-  return new Blob([img], { type: mime && mime.indexOf('/') > 0 ? mime : 'image/jpeg' });
+  const type = (mime && mime.indexOf('/') > 0) ? mime : 'image/jpeg';
+  try { return new Blob([img], { type: type }); }
+  catch (e) { return null; }
 }
 
 function parseID3(buffer) {
@@ -469,9 +542,9 @@ function parseID3(buffer) {
     const size = syncsafe(b, 6);
     let pos = 10;
 
-    if (flags & 0x40) { // extended header
-      if (ver === 3) pos += 4 + readU32(b, pos);
-      else if (ver === 4) pos += syncsafe(b, pos);
+    if (flags & 0x40) {
+      if (ver === 3 && pos + 4 <= b.length) pos += 4 + readU32(b, pos);
+      else if (ver === 4 && pos + 4 <= b.length) pos += syncsafe(b, pos);
     }
 
     const end = Math.min(b.length, 10 + size);
@@ -480,12 +553,14 @@ function parseID3(buffer) {
     while (pos + 6 < end) {
       let id, fsize, hlen;
       if (ver === 2) {
+        if (pos + 6 > end) break;
         id = str3(b, pos);
         fsize = (b[pos + 3] << 16) | (b[pos + 4] << 8) | b[pos + 5];
         hlen = 6;
       } else {
+        if (pos + 10 > end) break;
         id = str4(b, pos);
-        fsize = ver === 4 ? syncsafe(b, pos + 4) : readU32(b, pos + 4);
+        fsize = (ver === 4) ? syncsafe(b, pos + 4) : readU32(b, pos + 4);
         hlen = 10;
       }
       if (!/^[A-Z0-9]{3,4}$/.test(id)) break;
@@ -494,9 +569,9 @@ function parseID3(buffer) {
       if (fsize <= 0 || start + fsize > end) break;
       const data = b.subarray(start, start + fsize);
 
-      if (id === 'TIT2' || id === 'TT2') tags.title = decodeText(data);
+      if (id === 'TIT2' || id === 'TT2')      tags.title  = decodeText(data);
       else if (id === 'TPE1' || id === 'TP1') tags.artist = decodeText(data);
-      else if (id === 'TALB' || id === 'TAL') tags.album = decodeText(data);
+      else if (id === 'TALB' || id === 'TAL') tags.album  = decodeText(data);
       else if ((id === 'APIC' || id === 'PIC') && !tags.art) {
         try { tags.art = parseAPIC(data, ver === 2); } catch (e) { /* ignore */ }
       }
@@ -509,40 +584,50 @@ function parseID3(buffer) {
 }
 
 /* ============================================================
-   FILE NAME FALLBACK
+   FILENAME FALLBACK
    ============================================================ */
 function parseName(name) {
-  const base = name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
+  const base = String(name || '').replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
   const parts = base.split(/\s+-\s+/);
   if (parts.length >= 2) {
     return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
   }
-  return { artist: '', title: base };
+  return { artist: '', title: base || 'Untitled' };
 }
 
+/* ============================================================
+   DURATION PROBE
+   ============================================================ */
 function probeDuration(file) {
   return new Promise(resolve => {
     let settled = false;
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('audio');
-    const finish = (d) => {
+    let url = null;
+    const done = (d) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       try { a.removeAttribute('src'); a.load(); } catch (e) {}
-      URL.revokeObjectURL(url);
+      if (url) { try { URL.revokeObjectURL(url); } catch (e) {} }
       resolve(isFinite(d) && d > 0 ? d : 0);
     };
-    const timer = setTimeout(() => finish(0), 12000);
-    a.preload = 'metadata';
-    a.onloadedmetadata = () => finish(a.duration);
-    a.onerror = () => finish(0);
-    a.src = url;
+    const timer = setTimeout(() => done(0), 15000);
+    let a;
+    try {
+      url = URL.createObjectURL(file);
+      a = document.createElement('audio');
+      a.preload = 'metadata';
+      a.muted = true;
+      a.onloadedmetadata = () => done(a.duration);
+      a.onerror = () => done(0);
+      a.src = url;
+    } catch (e) {
+      done(0);
+    }
   });
 }
 
 /* ============================================================
-   STATE
+   SETTINGS
    ============================================================ */
 const LS_KEY = 'resonance.settings.v1';
 const DEFAULTS = {
@@ -556,7 +641,7 @@ const DEFAULTS = {
   reduceMotion: false,
   highContrast: false
 };
-let settings = Object.assign({}, DEFAULTS, loadJSON(LS_KEY, {}));
+const settings = Object.assign({}, DEFAULTS, loadJSON(LS_KEY, {}));
 
 const state = {
   tracks: [],
@@ -570,10 +655,15 @@ const state = {
   artObserver: null
 };
 
+/* ============================================================
+   AUDIO ELEMENT
+   ============================================================ */
 const audio = new Audio();
 audio.preload = 'metadata';
 audio.volume = settings.volume;
+audio.playbackRate = settings.speed;
 audio.setAttribute('playsinline', '');
+audio.crossOrigin = 'anonymous';
 document.body.appendChild(audio);
 
 let currentObjectURL = null;
@@ -581,7 +671,7 @@ let lastSessionArtURL = null;
 let scrubbing = false;
 
 /* ============================================================
-   DOM
+   DOM REFS
    ============================================================ */
 const dom = {
   status: $('#status'),
@@ -620,7 +710,7 @@ const dom = {
 };
 
 /* ============================================================
-   SETTINGS
+   SETTINGS — APPLY / SAVE
    ============================================================ */
 function saveSettings() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(settings)); } catch (e) {}
@@ -634,7 +724,15 @@ function flashSaved() {
     dom.savedBadge.textContent = 'Settings stored locally';
   }, 1400);
 }
-
+function paintSwitch(el, on) {
+  if (!el) return;
+  el.classList.toggle('on', !!on);
+  el.setAttribute('aria-checked', String(!!on));
+}
+function paintRange(el, pct) {
+  if (!el) return;
+  el.style.setProperty('--pct', clamp(pct, 0, 100) + '%');
+}
 function applySettings() {
   document.body.classList.toggle('no-scene', !settings.scene);
   document.body.classList.toggle('card-hover', !!settings.cardHover);
@@ -646,22 +744,6 @@ function applySettings() {
   syncShuffleUI();
   syncRepeatUI();
 }
-
-function bindSwitch(el, key, after) {
-  if (!el) return;
-  el.addEventListener('click', () => {
-    settings[key] = !settings[key];
-    saveSettings();
-    paintSwitch(el, settings[key]);
-    if (after) after();
-    flashSaved();
-  });
-}
-function paintSwitch(el, on) {
-  el.classList.toggle('on', !!on);
-  el.setAttribute('aria-checked', String(!!on));
-}
-
 function syncShuffleUI() {
   paintSwitch($('#setShuffle'), settings.shuffle);
   dom.railShuffle.classList.toggle('on', settings.shuffle);
@@ -671,9 +753,15 @@ function syncRepeatUI() {
   dom.railRepeat.classList.toggle('on', settings.repeat !== 'off');
   dom.railRepeat.title = 'Repeat: ' + settings.repeat;
 }
-
-function paintRange(el, pct) {
-  el.style.setProperty('--pct', clamp(pct, 0, 100) + '%');
+function bindSwitch(el, key, after) {
+  if (!el) return;
+  el.addEventListener('click', () => {
+    settings[key] = !settings[key];
+    saveSettings();
+    paintSwitch(el, settings[key]);
+    if (after) after();
+    flashSaved();
+  });
 }
 
 /* ============================================================
@@ -685,7 +773,6 @@ function setStatus(kind, label) {
   dom.status.classList.toggle('pulse', kind === 'importing' || kind === 'paused');
   dom.status.classList.toggle('playing', kind === 'playing');
 }
-
 function updateNowPlaying(meta) {
   if (!meta) {
     dom.nowTitle.textContent = 'Resonance';
@@ -699,15 +786,13 @@ function updateNowPlaying(meta) {
   dom.readTitle.textContent = meta.title || meta.name;
   dom.readSub.textContent = (meta.artist || 'Unknown artist') + (meta.duration ? ' · ' + fmtTime(meta.duration) : '');
 }
-
 function setPlayIcon(playing) {
   const use = dom.dockPlayIcon.querySelector('use');
   if (use) use.setAttribute('href', playing ? '#i-pause' : '#i-play');
   dom.dockPlay.setAttribute('aria-label', playing ? 'Pause' : 'Play');
 }
-
 function updateMediaSession(meta, art) {
-  if (!('mediaSession' in navigator)) return;
+  if (!('mediaSession' in navigator) || typeof window.MediaMetadata !== 'function') return;
   try {
     if (lastSessionArtURL) { URL.revokeObjectURL(lastSessionArtURL); lastSessionArtURL = null; }
     const artwork = [];
@@ -732,11 +817,19 @@ async function playTrack(id, autoplay) {
   const meta = state.tracks.find(t => t.id === id);
   if (!meta) return;
 
-  let rec;
-  try { rec = await idbGet('blobs', id); } catch (e) { rec = null; }
-  if (!rec || !rec.blob) { toast('Track data is missing from storage.'); return; }
+  let rec = null;
+  try { rec = await idbGet('blobs', id); }
+  catch (e) { rec = null; }
 
-  if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
+  if (!rec || !rec.blob) {
+    toast('Track data is missing from storage.');
+    return;
+  }
+
+  if (currentObjectURL) {
+    try { URL.revokeObjectURL(currentObjectURL); } catch (e) {}
+    currentObjectURL = null;
+  }
   currentObjectURL = URL.createObjectURL(rec.blob);
 
   audio.src = currentObjectURL;
@@ -760,7 +853,7 @@ async function playTrack(id, autoplay) {
 }
 
 function buildQueue(preferredId) {
-  const list = state.view.length ? state.view.map(t => t.id) : state.tracks.map(t => t.id);
+  const list = (state.view.length ? state.view : state.tracks).map(t => t.id);
   state.queue = list.slice();
   if (preferredId && state.queue.indexOf(preferredId) === -1) state.queue.unshift(preferredId);
 }
@@ -779,7 +872,7 @@ function stepIndex(dir) {
   }
   let n = i + dir;
   if (n >= q.length) return settings.repeat === 'all' ? 0 : -1;
-  if (n < 0) return settings.repeat === 'all' ? q.length - 1 : -1;
+  if (n < 0)         return settings.repeat === 'all' ? q.length - 1 : -1;
   return n;
 }
 
@@ -805,8 +898,7 @@ audio.addEventListener('pause', () => {
 });
 audio.addEventListener('ended', () => {
   if (settings.repeat === 'one') {
-    audio.currentTime = 0;
-    audio.play().catch(() => {});
+    try { audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {}
     return;
   }
   if (settings.autoplay) playNext(1);
@@ -816,7 +908,6 @@ audio.addEventListener('error', () => {
   setStatus('paused', 'Error');
   setPlayIcon(false);
 });
-
 audio.addEventListener('timeupdate', updateTimeUI);
 audio.addEventListener('loadedmetadata', updateTimeUI);
 audio.addEventListener('durationchange', updateTimeUI);
@@ -840,7 +931,10 @@ function filterTracks() {
   let list = state.tracks.slice();
   const q = state.query.trim().toLowerCase();
   if (q) {
-    list = list.filter(t => ((t.title || '') + ' ' + (t.artist || '') + ' ' + (t.album || '') + ' ' + (t.name || '')).toLowerCase().indexOf(q) !== -1);
+    list = list.filter(t => {
+      const hay = ((t.title || '') + ' ' + (t.artist || '') + ' ' + (t.album || '') + ' ' + (t.name || '')).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    });
   }
   if (state.filter === 'recent') {
     const cutoff = Date.now() - 1000 * 60 * 60 * 24 * 14;
@@ -850,7 +944,7 @@ function filterTracks() {
     list = list.filter(t => t.favorite);
     list.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
   } else if (state.filter === 'long') {
-    list = list.filter(t => t.duration > 300);
+    list = list.filter(t => (t.duration || 0) > 300);
     list.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
   } else {
     list.sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' }));
@@ -870,8 +964,8 @@ function refresh() {
 function renderGrid() {
   const token = ++renderToken;
 
-  // release previously rendered artwork urls
-  state.artUrls.forEach(url => { if (url) URL.revokeObjectURL(url); });
+  // Clean up previous artwork URLs
+  state.artUrls.forEach(url => { if (url) { try { URL.revokeObjectURL(url); } catch (e) {} } });
   state.artUrls.clear();
   if (state.artObserver) { state.artObserver.disconnect(); }
   state.artObserver = ('IntersectionObserver' in window)
@@ -884,7 +978,7 @@ function renderGrid() {
   if (!list.length) return;
 
   let i = 0;
-  const CHUNK = 48;
+  const CHUNK = 40;
   (function step() {
     if (token !== renderToken) return;
     const frag = document.createDocumentFragment();
@@ -927,15 +1021,13 @@ function makeCard(t) {
   card.setAttribute('aria-label', (t.title || t.name) + ' by ' + (t.artist || 'Unknown artist'));
 
   const preview = document.createElement('div');
-  preview.className = 'preview';
+  preview.className = 'preview generated';
 
   if (t.hasArt && state.artObserver) {
-    preview.classList.add('generated');
     preview.innerHTML = '<div class="bars"><i style="height:38%"></i><i style="height:62%"></i><i style="height:46%"></i><i style="height:74%"></i><i style="height:52%"></i></div>';
     state.artObserver.observe(card);
   } else {
     const hue = 330 + (hashStr(t.id) % 40);
-    preview.classList.add('generated');
     preview.style.setProperty('--h', hue);
     const bars = document.createElement('div');
     bars.className = 'bars';
@@ -985,7 +1077,10 @@ function makeCard(t) {
   card.appendChild(actions);
 
   card.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playFromLibrary(t.id); }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      playFromLibrary(t.id);
+    }
   });
 
   return card;
@@ -1004,80 +1099,150 @@ function updateVaultMeta() {
 }
 
 /* ============================================================
-   IMPORT
+   IMPORT — the important part
+   ------------------------------------------------------------
+   * Files are copied into an array BEFORE the input is cleared.
+   * `state.importing` is always reset via try/finally.
+   * Each file import is wrapped in its own try/catch so one bad
+   * file does not abort the whole batch.
    ============================================================ */
-const AUDIO_RE = /\.(mp3|m4a|m4b|aac|wav|wave|flac|ogg|oga|opus|aif|aiff|weba)$/i;
-const isAudio = f => (f.type && f.type.indexOf('audio/') === 0) || AUDIO_RE.test(f.name || '');
+const AUDIO_RE = /\.(mp3|m4a|m4b|aac|wav|wave|flac|ogg|oga|opus|aif|aiff|weba|mp4|m4p)$/i;
+
+function isAudioFile(f) {
+  if (!f) return false;
+  const type = (f.type || '').toLowerCase();
+  if (type.indexOf('audio/') === 0) return true;
+  if (type.indexOf('video/mp4') === 0 && /\.(m4a|m4b|mp4)$/i.test(f.name || '')) return true;
+  return AUDIO_RE.test(f.name || '');
+}
+
+async function importOne(file, index, total) {
+  const id = uid();
+
+  // --- 1. ID3 tags (best effort) ---
+  let tags = null;
+  try {
+    const headSize = Math.min(file.size, 1024 * 1024); // 1 MB head
+    if (headSize > 0) {
+      const headBuf = await file.slice(0, headSize).arrayBuffer();
+      tags = parseID3(headBuf);
+    }
+  } catch (e) {
+    tags = null;
+  }
+
+  // --- 2. Duration (best effort) ---
+  let duration = 0;
+  try { duration = await probeDuration(file); }
+  catch (e) { duration = 0; }
+
+  // --- 3. Build record ---
+  const fallback = parseName(file.name);
+  const title  = (tags && tags.title)  || fallback.title || file.name || 'Untitled';
+  const artist = (tags && tags.artist) || fallback.artist || 'Unknown artist';
+  const album  = (tags && tags.album)  || '';
+
+  const rec = {
+    id: id,
+    name: file.name || (title + '.mp3'),
+    title: title,
+    artist: artist,
+    album: album,
+    size: file.size || 0,
+    type: file.type || 'audio/mpeg',
+    duration: duration,
+    added: Date.now(),
+    favorite: false,
+    hasArt: !!(tags && tags.art)
+  };
+
+  // --- 4. Persist ---
+  await idbPut('meta', rec);
+
+  // Store the audio as a Blob (convert File to plain Blob for best Safari compat)
+  let storedBlob = file;
+  try {
+    if (file instanceof File) {
+      storedBlob = file.slice(0, file.size, file.type || 'audio/mpeg');
+    }
+  } catch (e) {
+    storedBlob = file;
+  }
+  await idbPut('blobs', { id: id, blob: storedBlob });
+
+  if (tags && tags.art) {
+    try { await idbPut('art', { id: id, blob: tags.art }); }
+    catch (e) { rec.hasArt = false; }
+  }
+
+  state.tracks.push(rec);
+  return rec;
+}
 
 async function importFiles(fileList) {
   if (state.importing) { toast('An import is already running.'); return; }
 
-  const files = Array.prototype.slice.call(fileList).filter(isAudio);
-  if (!files.length) { toast('No supported audio files found.'); return; }
+  // CRITICAL: snapshot the FileList into a plain array immediately.
+  const rawFiles = toArray(fileList);
+  const files = rawFiles.filter(isAudioFile);
+
+  if (!rawFiles.length) {
+    toast('No files selected.');
+    return;
+  }
+  if (!files.length) {
+    toast('No supported audio files in selection.');
+    return;
+  }
 
   state.importing = true;
   setStatus('importing');
-  showToast('Importing 0 / ' + files.length, 0);
-
-  // Silently ask for durable storage on first import.
-  try {
-    if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
-  } catch (e) {}
+  showToast('Preparing ' + files.length + ' file' + (files.length === 1 ? '' : 's') + '…', 0);
 
   let done = 0;
   let failed = 0;
+  const errors = [];
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    try {
-      const id = uid();
-      let tags = null;
-      try {
-        const headBuf = await file.slice(0, Math.min(file.size, 768 * 1024)).arrayBuffer();
-        tags = parseID3(headBuf);
-      } catch (e) { tags = null; }
-
-      const fallback = parseName(file.name);
-      const duration = await probeDuration(file);
-
-      const rec = {
-        id: id,
-        name: file.name,
-        title: (tags && tags.title) || fallback.title || file.name,
-        artist: (tags && tags.artist) || fallback.artist || 'Unknown artist',
-        album: (tags && tags.album) || '',
-        size: file.size,
-        type: file.type || 'audio/mpeg',
-        duration: duration,
-        added: Date.now(),
-        favorite: false,
-        hasArt: !!(tags && tags.art)
-      };
-
-      await idbPut('meta', rec);
-      await idbPut('blobs', { id: id, blob: file });
-      if (tags && tags.art) await idbPut('art', { id: id, blob: tags.art });
-
-      state.tracks.push(rec);
-    } catch (e) {
-      failed++;
-      console.warn('Import failed:', file.name, e);
+  try {
+    // Ask for persistent storage (fire-and-forget-ish, but await briefly).
+    if (navigator.storage && navigator.storage.persist) {
+      try { await navigator.storage.persist(); } catch (e) {}
     }
 
-    done++;
-    showToast('Importing ' + done + ' / ' + files.length, (done / files.length) * 100);
-    await tick();
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        await importOne(file, i, files.length);
+        done++;
+      } catch (e) {
+        failed++;
+        errors.push({ name: file.name || ('file ' + (i + 1)), error: e });
+        console.error('[Resonance] Import failed for', file.name, e);
+      }
+      const pct = ((done + failed) / files.length) * 100;
+      showToast('Importing ' + (done + failed) + ' / ' + files.length, pct);
+      await nextFrame();
+    }
+
+    hideToast();
+    refresh();
+    setStatus(state.currentId ? 'paused' : 'idle');
+
+    if (failed && done) {
+      toast(done + ' imported · ' + failed + ' skipped');
+    } else if (failed && !done) {
+      toast('Import failed. See console for details.');
+    } else {
+      toast(done + ' track' + (done === 1 ? '' : 's') + ' added to the vault');
+    }
+  } catch (e) {
+    console.error('[Resonance] Import error:', e);
+    toast('Import failed: ' + (e && e.message ? e.message : 'unknown error'));
+    setStatus('idle');
+  } finally {
+    state.importing = false;
+    updateStorage();
   }
-
-  state.importing = false;
-  hideToast();
-  refresh();
-  setStatus(state.currentId ? 'paused' : 'idle');
-
-  const ok = done - failed;
-  toast(failed
-    ? ok + ' imported · ' + failed + ' skipped'
-    : ok + ' track' + (ok === 1 ? '' : 's') + ' added to the vault');
 }
 
 /* ============================================================
@@ -1089,18 +1254,21 @@ async function removeTrack(id) {
   if (!confirm('Remove "' + (meta.title || meta.name) + '" from this device?')) return;
 
   await Promise.all([
-    idbDel('meta', id).catch(() => {}),
+    idbDel('meta',  id).catch(() => {}),
     idbDel('blobs', id).catch(() => {}),
-    idbDel('art', id).catch(() => {})
+    idbDel('art',   id).catch(() => {})
   ]);
 
   state.tracks = state.tracks.filter(t => t.id !== id);
-  state.queue = state.queue.filter(x => x !== id);
+  state.queue  = state.queue.filter(x => x !== id);
 
   if (state.currentId === id) {
     audio.pause();
-    audio.removeAttribute('src');
-    if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
+    try { audio.removeAttribute('src'); audio.load(); } catch (e) {}
+    if (currentObjectURL) {
+      try { URL.revokeObjectURL(currentObjectURL); } catch (e) {}
+      currentObjectURL = null;
+    }
     state.currentId = null;
     updateNowPlaying(null);
     setPlayIcon(false);
@@ -1108,7 +1276,7 @@ async function removeTrack(id) {
   }
 
   const cached = state.artUrls.get(id);
-  if (cached) { URL.revokeObjectURL(cached); state.artUrls.delete(id); }
+  if (cached) { try { URL.revokeObjectURL(cached); } catch (e) {} state.artUrls.delete(id); }
 
   refresh();
 }
@@ -1158,7 +1326,8 @@ async function requestPersist() {
   }
   let granted = false;
   try {
-    granted = (navigator.storage.persisted && await navigator.storage.persisted()) || await navigator.storage.persist();
+    if (navigator.storage.persisted) granted = await navigator.storage.persisted();
+    if (!granted) granted = await navigator.storage.persist();
   } catch (e) {}
   dom.persistDesc.textContent = granted
     ? 'Granted — the library is protected from automatic cleanup.'
@@ -1171,14 +1340,13 @@ async function clearLibrary() {
   if (!confirm('Erase all ' + state.tracks.length + ' tracks from this browser? This cannot be undone.')) return;
 
   audio.pause();
-  audio.removeAttribute('src');
-  if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
+  try { audio.removeAttribute('src'); audio.load(); } catch (e) {}
+  if (currentObjectURL) { try { URL.revokeObjectURL(currentObjectURL); } catch (e) {} currentObjectURL = null; }
 
-  try {
-    await Promise.all([idbClear('meta'), idbClear('blobs'), idbClear('art')]);
-  } catch (e) {}
+  try { await Promise.all([idbClear('meta'), idbClear('blobs'), idbClear('art')]); }
+  catch (e) { console.warn('Clear failed', e); }
 
-  state.artUrls.forEach(u => { if (u) URL.revokeObjectURL(u); });
+  state.artUrls.forEach(u => { if (u) { try { URL.revokeObjectURL(u); } catch (e) {} } });
   state.artUrls.clear();
   state.tracks = [];
   state.view = [];
@@ -1213,11 +1381,11 @@ function hideToast(delay) {
 }
 function toast(text) {
   showToast(text);
-  hideToast(2600);
+  hideToast(2800);
 }
 
 /* ============================================================
-   LIBRARY / VAULT UI
+   VAULT / SETTINGS OPEN-CLOSE
    ============================================================ */
 function openVault() {
   dom.vault.classList.add('open');
@@ -1238,7 +1406,6 @@ function closeSettings() {
   dom.settings.classList.remove('open');
   dom.settings.setAttribute('aria-hidden', 'true');
 }
-
 function playFromLibrary(id) {
   buildQueue(id);
   playTrack(id, true);
@@ -1252,7 +1419,8 @@ function bindUI() {
   /* --- transport --- */
   dom.dockPlay.addEventListener('click', () => {
     if (!state.currentId) {
-      if (state.view.length || state.tracks.length) {
+      const list = state.view.length ? state.view : state.tracks;
+      if (list.length) {
         buildQueue();
         playTrack(state.queue[0], true);
       } else {
@@ -1260,7 +1428,8 @@ function bindUI() {
       }
       return;
     }
-    if (audio.paused) audio.play().catch(() => {}); else audio.pause();
+    if (audio.paused) audio.play().catch(() => {});
+    else audio.pause();
   });
 
   dom.dockPrev.addEventListener('click', () => {
@@ -1303,7 +1472,7 @@ function bindUI() {
   $('#railFocus').addEventListener('click', (e) => {
     e.stopPropagation();
     document.body.classList.add('cinema');
-    dom.vault.classList.remove('open');
+    closeVault();
     closeSettings();
     setTimeout(() => {
       const exit = () => {
@@ -1410,11 +1579,18 @@ function bindUI() {
   $('#setPersist').addEventListener('click', requestPersist);
   $('#setClear').addEventListener('click', clearLibrary);
 
-  /* --- file input --- */
+  /* ----------------------------------------------------------
+     FILE INPUT — THE FIX
+     Copy the FileList into a real array first, THEN clear the
+     input. Clearing before copying empties the FileList in
+     Safari, iOS, and some Chromium builds.
+     ---------------------------------------------------------- */
   dom.fileInput.addEventListener('change', () => {
     const files = dom.fileInput.files;
+    if (!files || !files.length) return;
+    const snapshot = toArray(files);
     dom.fileInput.value = '';
-    if (files && files.length) importFiles(files);
+    importFiles(snapshot);
   });
 
   /* --- drag & drop --- */
@@ -1435,7 +1611,8 @@ function bindUI() {
     dragDepth = 0;
     dom.dropzone.classList.remove('show');
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
-      importFiles(e.dataTransfer.files);
+      const snapshot = toArray(e.dataTransfer.files);
+      importFiles(snapshot);
     }
   });
 
@@ -1445,13 +1622,17 @@ function bindUI() {
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     if (e.code === 'Space') {
       e.preventDefault();
-      if (state.currentId) { if (audio.paused) audio.play().catch(() => {}); else audio.pause(); }
+      if (state.currentId) {
+        if (audio.paused) audio.play().catch(() => {});
+        else audio.pause();
+      }
     } else if (e.code === 'ArrowRight' && e.shiftKey) {
       playNext(1);
     } else if (e.code === 'ArrowLeft' && e.shiftKey) {
       playNext(-1);
     } else if (e.key === 'Escape') {
-      closeVault(); closeSettings();
+      closeVault();
+      closeSettings();
       document.body.classList.remove('cinema');
     } else if (e.key === 'c' || e.key === 'C') {
       document.body.classList.toggle('cinema');
@@ -1461,12 +1642,21 @@ function bindUI() {
   /* --- media session --- */
   if ('mediaSession' in navigator) {
     try {
-      navigator.mediaSession.setActionHandler('play', () => audio.play().catch(() => {}));
-      navigator.mediaSession.setActionHandler('pause', () => audio.pause());
+      navigator.mediaSession.setActionHandler('play',          () => audio.play().catch(() => {}));
+      navigator.mediaSession.setActionHandler('pause',         () => audio.pause());
       navigator.mediaSession.setActionHandler('previoustrack', () => playNext(-1));
-      navigator.mediaSession.setActionHandler('nexttrack', () => playNext(1));
+      navigator.mediaSession.setActionHandler('nexttrack',     () => playNext(1));
     } catch (e) {}
   }
+
+  /* --- warn before leaving mid-import --- */
+  window.addEventListener('beforeunload', e => {
+    if (state.importing) {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+  });
 }
 
 /* ============================================================
@@ -1477,11 +1667,18 @@ async function init() {
 
   try {
     db = await openDB();
+    dbReady = true;
     state.tracks = await idbAll('meta');
+    // Sanitize any corrupt records
+    state.tracks = state.tracks.filter(t => t && t.id && typeof t.id === 'string');
   } catch (e) {
-    console.warn('IndexedDB unavailable', e);
+    console.warn('[Resonance] IndexedDB unavailable:', e);
     db = null;
-    toast('Local storage is unavailable — imports will not persist.');
+    dbReady = false;
+    // Show a non-blocking warning
+    setTimeout(() => {
+      toast('Local storage unavailable — imports will not persist.');
+    }, 600);
   }
 
   bindUI();
@@ -1493,7 +1690,11 @@ async function init() {
   updateNowPlaying(null);
 }
 
-document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init, { once: true });
+} else {
+  init();
+}
 
 })();
 </script>
