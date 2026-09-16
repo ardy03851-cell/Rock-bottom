@@ -2,631 +2,1242 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <!-- Optimized for iPad and mobile touch -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Rock Bottom</title>
+    <meta charset="utf-8">
+    <meta name="viewport"
+        content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#07080f">
+    <title>The Shape of Two</title>
     <style>
+        :root {
+            color-scheme: dark;
+        }
+
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            /* Disable text selection and mobile tap highlights */
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
         }
 
-        body,
-        html {
+        html,
+        body {
             width: 100%;
             height: 100%;
-            background-color: #111;
             overflow: hidden;
-            touch-action: none;
-            /* Prevent iPad scrolling */
+            background: #05060c;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            font-family: Georgia, 'Times New Roman', serif;
+            overscroll-behavior: none;
         }
 
-        canvas {
+        #stage {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
             display: block;
-            width: 100%;
-            height: 100%;
-            /* Keeps 16x16 pixel art crisp */
-            image-rendering: pixelated;
-        }
-
-        /* UI Overlay */
-        #ui {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-
-        /* Standard buttons ready for custom textures */
-        .btn {
-            pointer-events: auto;
-            margin: 10px;
-            font-size: 0;
-            color: transparent;
-            background: none;
-            border: none;
-            padding: 0;
-            cursor: pointer;
-            image-rendering: pixelated;
-            width: 220px;
-            height: 64px;
-            /* Background image setup for when you add your textures */
-            background-size: 100% 100%;
-            background-position: center;
-            background-repeat: no-repeat;
-        }
-
-        .btn:active {
-            transform: scale(0.95);
-        }
-
-        #startBtn {
-            background-image: url('textures/btn_start.png');
-        }
-
-        #restartBtn {
-            background-image: url('textures/btn_restart.png');
-        }
-
-        #title {
-            font-family: 'Courier New', Courier, monospace;
-            color: white;
-            font-size: 48px;
-            margin-bottom: 20px;
-            text-shadow: 2px 2px 0px #000;
-        }
-
-        .hidden {
-            display: none !important;
+            touch-action: none;
         }
     </style>
 </head>
 
 <body>
-
-    <canvas id="gameCanvas"></canvas>
-
-    <div id="ui">
-        <h1 id="title">The Rock Bottom</h1>
-        <!-- In the future you can set CSS: background-image: url('textures/btn_start.png') -->
-        <button id="startBtn" class="btn">START GAME</button>
-        <button id="restartBtn" class="btn hidden">RESTART</button>
-    </div>
-
+    <canvas id="stage"></canvas>
+    <script src="models.js"></script>
     <script>
-        // --- Game Setup & Canvas ---
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-        const ui = document.getElementById('ui');
-        const startBtn = document.getElementById('startBtn');
-        const restartBtn = document.getElementById('restartBtn');
-        const title = document.getElementById('title');
+        (function () {
+'use strict';
 
-        let width = canvas.width = window.innerWidth;
-        let height = canvas.height = window.innerHeight;
+const M = Models;
+const { clamp, lerp, rand, dist, Ease, TAU } = M;
 
-        window.addEventListener('resize', () => {
-            width = canvas.width = window.innerWidth;
-            height = canvas.height = window.innerHeight;
-            ctx.imageSmoothingEnabled = false; // Keep pixel art sharp
-        });
+/* =========================================================
+   CANVAS
+   ========================================================= */
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d', { alpha: false });
+let W = 0, H = 0, DPR = 1;
 
-        // --- Asset Management ---
-        const assets = {
-            player: new Image(),
-            hook: new Image(),
-            wall: new Image(),
-            bg_layer1: new Image(),
-            bg_layer2: new Image(),
-            btn_start: new Image(),
-            btn_restart: new Image()
-        };
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = Math.round(canvas.clientWidth || window.innerWidth);
+  H = Math.round(canvas.clientHeight || window.innerHeight);
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  onResize();
+}
 
-        // Fallback generator if images aren't in the textures/ folder yet
-        function createFallback(color, isRound = false) {
-            let c = document.createElement('canvas');
-            c.width = 16; c.height = 16;
-            let cx = c.getContext('2d');
-            cx.fillStyle = color;
-            if(isRound) {
-                cx.beginPath();
-                cx.arc(8, 8, 8, 0, Math.PI*2);
-                cx.fill();
-            } else {
-                cx.fillRect(0,0,16,16);
-                cx.fillStyle = 'rgba(0,0,0,0.3)';
-                cx.fillRect(4,4,8,8);
-            }
-            return c;
-        }
+/* =========================================================
+   AUDIO  (tiny ambient pad + soft chimes)
+   ========================================================= */
+const Audio_ = {
+  ctx: null, master: null, voices: [], ready: false, muted: false,
+  unlock() {
+    if (this.ready) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      this.ctx = new AC();
+      const c = this.ctx;
+      this.master = c.createGain();
+      this.master.gain.value = 0;
+      const filt = c.createBiquadFilter();
+      filt.type = 'lowpass';
+      filt.frequency.value = 720;
+      filt.Q.value = 0.6;
+      filt.connect(this.master);
+      this.master.connect(c.destination);
 
-        function createButtonFallback(text, color) {
-            let c = document.createElement('canvas');
-            c.width = 220; c.height = 64;
-            let cx = c.getContext('2d');
-            cx.fillStyle = color;
-            cx.fillRect(0, 0, 220, 64);
-            cx.strokeStyle = '#ffffff';
-            cx.lineWidth = 4;
-            cx.strokeRect(2, 2, 216, 60);
-            cx.fillStyle = '#ffffff';
-            cx.font = 'bold 22px Courier New';
-            cx.textAlign = 'center';
-            cx.textBaseline = 'middle';
-            cx.fillText(text, 110, 32);
-            return c.toDataURL();
-        }
+      // slow breathing LFO
+      const lfo = c.createOscillator();
+      lfo.frequency.value = 0.06;
+      const lfoGain = c.createGain();
+      lfoGain.gain.value = 0.022;
+      lfo.connect(lfoGain);
+      lfoGain.connect(this.master.gain);
+      lfo.start();
 
-        // Attempt to load images, apply fallbacks if they fail
-        const textureFiles = {
-            player: 'textures/player.png',
-            hook: 'textures/hook.png',
-            wall: 'textures/wall.png',
-            bg_layer1: 'textures/bg_layer1.png',
-            bg_layer2: 'textures/bg_layer2.png',
-            btn_start: 'textures/btn_start.png',
-            btn_restart: 'textures/btn_restart.png'
-        };
+      for (let i = 0; i < 4; i++) {
+        const o = c.createOscillator();
+        o.type = i === 0 ? 'sine' : 'sine';
+        o.frequency.value = 110 * (1 + i * 0.5);
+        o.detune.value = (i - 1.5) * 7;
+        const g = c.createGain();
+        g.gain.value = 0.22 / (1 + i * 0.7);
+        o.connect(g); g.connect(filt);
+        o.start();
+        this.voices.push({ o, g, ratio: 1 + i * 0.5 });
+      }
+      this.master.gain.setTargetAtTime(0.075, c.currentTime, 3.0);
+      this.ready = true;
+    } catch (e) { /* silent */ }
+  },
+  setRoot(f) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.voices.forEach(v => v.o.frequency.setTargetAtTime(f * v.ratio, t, 1.6));
+  },
+  chime(freq, vol) {
+    if (!this.ready || this.muted) return;
+    try {
+      const c = this.ctx, t = c.currentTime;
+      const o = c.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol || 0.045, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);
+      o.connect(g); g.connect(c.destination);
+      o.start(t); o.stop(t + 2.0);
+    } catch (e) {}
+  }
+};
 
-        const fallbacks = {
-            player: createFallback('#00ffcc', true).toDataURL(),
-            hook: createFallback('#ff3366', true).toDataURL(),
-            wall: createFallback('#665555').toDataURL(),
-            bg_layer1: createFallback('#1a1a24').toDataURL(),
-            bg_layer2: createFallback('#2a2a35').toDataURL(),
-            btn_start: createButtonFallback('START GAME', '#338844'),
-            btn_restart: createButtonFallback('RESTART', '#883333')
-        };
+/* =========================================================
+   STATE
+   ========================================================= */
+const S = {
+  t: 0,
+  mood: 'birth', prevMood: 'birth', moodT: 1,
+  spike: null, ashes: null, softs: [],
+  sparks: [], motes: [], stars: null,
+  text: '', hint: '', hintA: 0,
+  shake: 0, flash: 0, flashCol: '#ffffff',
+  holdT: 0, holdNeed: 0, holding: false,
+  dragging: false, pointerX: 0, pointerY: 0,
+  touched: false, aligned: false, ended: false,
+  endT: 0
+};
 
-        for (let key in assets) {
-            assets[key].src = textureFiles[key];
-            assets[key].onload = () => {
-                if (key === 'btn_start') startBtn.style.backgroundImage = `url('${assets[key].src}')`;
-                if (key === 'btn_restart') restartBtn.style.backgroundImage = `url('${assets[key].src}')`;
-            };
-            assets[key].onerror = () => {
-                console.warn(`Could not load ${textureFiles[key]}, using fallback.`);
-                assets[key].src = fallbacks[key];
-                if (key === 'btn_start') startBtn.style.backgroundImage = `url('${fallbacks.btn_start}')`;
-                if (key === 'btn_restart') restartBtn.style.backgroundImage = `url('${fallbacks.btn_restart}')`;
-            };
-        }
-        startBtn.style.backgroundImage = `url('${fallbacks.btn_start}')`;
-        restartBtn.style.backgroundImage = `url('${fallbacks.btn_restart}')`;
+let step = null, cur = 0, stepTime = 0;
+let textShown = 0, textTotal = 0, revealDone = false;
+let layoutCache = null, layoutKey = '';
+let fadeIn = 1;
 
-        // --- World & Collision Setup ---
-        const World = {
-            width: 4000,
-            height: 2000,
-            collisionData: null, // Will hold the pixel array
-        };
+/* =========================================================
+   BACKGROUND
+   ========================================================= */
+function currentMood() {
+  const a = M.Moods[S.prevMood] || M.Moods.birth;
+  const b = M.Moods[S.mood] || M.Moods.birth;
+  return M.mixMood(a, b, Ease.inOutSine(clamp(S.moodT, 0, 1)));
+}
 
-        // We draw the level to these offscreen canvases once
-        const bgCanvas = document.createElement('canvas');
-        const collisionCanvas = document.createElement('canvas');
-        bgCanvas.width = collisionCanvas.width = World.width;
-        bgCanvas.height = collisionCanvas.height = World.height;
-        const bgCtx = bgCanvas.getContext('2d');
-        const colCtx = collisionCanvas.getContext('2d');
-        bgCtx.imageSmoothingEnabled = false;
-        colCtx.imageSmoothingEnabled = false;
+function drawBackground(P) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, M.arr(P.sky[0], 1));
+  g.addColorStop(1, M.arr(P.sky[1], 1));
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
 
-        function drawRotatedImage(context, img, x, y, scale, rotation) {
-            if (!img.complete || img.naturalWidth === 0) return;
-            context.save();
-            context.translate(x, y);
-            context.rotate(rotation * Math.PI / 180);
-            context.scale(scale, scale);
-            // Draw centered
-            context.drawImage(img, -img.width / 2, -img.height / 2);
-            context.restore();
-        }
+  // soft horizon bloom
+  const hg = ctx.createRadialGradient(W * 0.5, H * 0.55, 0, W * 0.5, H * 0.55, Math.max(W, H) * 0.8);
+  hg.addColorStop(0, M.arr(P.glow, 0.075));
+  hg.addColorStop(0.55, M.arr(P.glow, 0.022));
+  hg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, W, H);
 
-        function generateLevel() {
-            bgCtx.clearRect(0, 0, World.width, World.height);
-            colCtx.clearRect(0, 0, World.width, World.height);
+  // stars
+  if (P.stars > 0.01) {
+    if (!S.stars) S.stars = new M.Stars(W, H, Math.round((W * H) / 13000));
+    S.stars.draw(ctx, S.t, clamp(P.stars, 0, 1), P.accent);
+  }
+}
 
-            // 1. Generate Deep Background (Layer 1 - parallaxed later, drawn huge here)
-            for(let i=0; i<300; i++) {
-                drawRotatedImage(bgCtx, assets.bg_layer1, Math.random() * World.width, Math.random() * World.height, Math.random() * 8 + 4, Math.random() * 360);
-            }
+function drawVignette() {
+  const v = ctx.createRadialGradient(W * 0.5, H * 0.5, Math.min(W, H) * 0.22, W * 0.5, H * 0.5, Math.max(W, H) * 0.8);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(0.7, 'rgba(0,0,0,0.35)');
+  v.addColorStop(1, 'rgba(0,0,0,0.86)');
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, W, H);
+}
 
-            // 2. Generate Midground (Layer 2)
-            for(let i=0; i<200; i++) {
-                drawRotatedImage(bgCtx, assets.bg_layer2, Math.random() * World.width, Math.random() * World.height, Math.random() * 6 + 2, Math.random() * 360);
-            }
+/* =========================================================
+   TEXT
+   ========================================================= */
+function getLayout(raw, font, maxW) {
+  const key = raw + '|' + font + '|' + Math.round(maxW);
+  if (layoutKey === key && layoutCache) return layoutCache;
+  ctx.font = font;
+  const lines = [];
+  let idx = 0;
+  const paras = raw.split('\n');
+  paras.forEach((para, pi) => {
+    if (para.trim() === '') { lines.push({ text: '', start: idx }); idx += 1; return; }
+    const words = para.split(' ');
+    let line = '';
+    for (let i = 0; i < words.length; i++) {
+      const test = line ? line + ' ' + words[i] : words[i];
+      if (ctx.measureText(test).width > maxW && line) {
+        lines.push({ text: line, start: idx });
+        idx += line.length + 1;
+        line = words[i];
+      } else {
+        line = test;
+      }
+    }
+    lines.push({ text: line, start: idx });
+    idx += line.length;
+    if (pi < paras.length - 1) idx += 1;
+  });
+  layoutCache = { lines, total: Math.max(1, idx) };
+  layoutKey = key;
+  return layoutCache;
+}
 
-            // 3. Generate Foreground / Collisions using Wall PNGs
-            // Floor & Ceiling Cave Generation
-            for(let x=0; x<World.width; x+= 100) {
-                // Ceiling
-                drawRotatedImage(colCtx, assets.wall, x, Math.random() * 150 + 50, Math.random() * 8 + 4, Math.random() * 360);
-                // Floor
-                drawRotatedImage(colCtx, assets.wall, x, World.height - (Math.random() * 200 + 100), Math.random() * 10 + 5, Math.random() * 360);
-            }
+function drawStoryText() {
+  if (!S.text) return;
+  const fs = clamp(Math.min(W, H) * 0.0295, 15, 22);
+  const font = '300 ' + fs + 'px Georgia, "Times New Roman", serif';
+  const maxW = Math.min(W * 0.82, 600);
+  const lay = getLayout(S.text, font, maxW);
+  const lh = fs * 1.78;
+  const blockH = lay.lines.length * lh;
+  const pad = Math.max(58, H * 0.10);
+  const top = clamp(H - pad - blockH, H * 0.44, H);
+  const colX = W * 0.5 - maxW * 0.5;
 
-            // Scattered Floating Rocks / Obstacles
-            for(let i=0; i<150; i++) {
-                drawRotatedImage(colCtx, assets.wall, Math.random() * World.width, Math.random() * (World.height - 600) + 300, Math.random() * 6 + 2, Math.random() * 360);
-            }
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
 
-            // Cache the collision pixel data to memory for ULTRA FAST per-pixel detection!
-            try {
-                const imgData = colCtx.getImageData(0, 0, World.width, World.height);
-                World.collisionData = imgData.data;
-            } catch (e) {
-                console.error("CORS error getting pixel data. Run on a local web server!", e);
-            }
-        }
+  let cursorX = 0, cursorY = 0, cursorOn = false;
 
-        // Check if a specific (x,y) pixel is visible (alpha > 0) in the PNG colliders
-        function isSolid(x, y) {
-            x = Math.floor(x);
-            y = Math.floor(y);
-            if (x < 0 || x >= World.width || y < 0 || y >= World.height) return true; // Bounds are solid
-            if (!World.collisionData) return false;
-            
-            // Index in 1D Uint8Array for (x,y). Array is [R,G,B,A, R,G,B,A...]
-            const alphaIndex = (y * World.width + x) * 4 + 3;
-            return World.collisionData[alphaIndex] > 10; // If mostly opaque, it's solid!
-        }
+  for (let i = 0; i < lay.lines.length; i++) {
+    const ln = lay.lines[i];
+    const y = top + i * lh + lh * 0.5;
+    const n = clamp(Math.floor(textShown) - ln.start, 0, ln.text.length);
+    if (n <= 0) continue;
+    const vis = ln.text.slice(0, n);
 
-        // Push objects out of solid pixels
-        function resolveCollision(entity) {
-            if (!isSolid(entity.x, entity.y)) return false;
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillText(vis, colX + 1, y + 1);
+    ctx.fillStyle = 'rgba(233,232,240,0.94)';
+    ctx.fillText(vis, colX, y);
 
-            // Search in an expanding circle for the nearest empty pixel
-            for (let r = 1; r < 30; r+=2) {
-                for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
-                    let cx = entity.x + Math.cos(angle) * r;
-                    let cy = entity.y + Math.sin(angle) * r;
-                    if (!isSolid(cx, cy)) {
-                        entity.x = cx;
-                        entity.y = cy;
-                        entity.vx *= 0.5; // Dampen speed on wall hit
-                        entity.vy *= 0.5;
-                        return true;
-                    }
-                }
-            }
-            return true;
-        }
+    if (n < ln.text.length) {
+      cursorX = colX + ctx.measureText(vis).width + 3;
+      cursorY = y;
+      cursorOn = true;
+    }
+  }
+  ctx.restore();
 
-        // --- Game Entities ---
-        let camera = { x: 0, y: 0 };
-        
-        let player = {
-            x: 200, y: World.height / 2,
-            vx: 0, vy: 0,
-            radius: 8
-        };
+  if (cursorOn && !revealDone) {
+    const pulse = 0.45 + 0.4 * Math.sin(S.t * 7);
+    const P = currentMood();
+    ctx.fillStyle = M.arr(P.accent, pulse);
+    ctx.beginPath();
+    ctx.arc(cursorX, cursorY + 1, 2.0, 0, TAU);
+    ctx.fill();
+  }
+}
 
-        let hook = {
-            active: false,
-            attached: false,
-            x: 0, y: 0,
-            vx: 0, vy: 0,
-            speed: 30,
-            ropeLength: 0,
-            nodes: []
-        };
-        let particles = [];
-        let gameState = 'menu'; // menu, playing, gameover
+function drawSpaced(text, cx, y, size, spacing, color, alpha) {
+  ctx.save();
+  ctx.font = '400 ' + size + 'px Georgia, "Times New Roman", serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  let total = 0;
+  for (const ch of text) total += ctx.measureText(ch).width + spacing;
+  total -= spacing;
+  let x = cx - total / 2;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = alpha;
+  for (const ch of text) {
+    ctx.fillText(ch, x, y);
+    x += ctx.measureText(ch).width + spacing;
+  }
+  ctx.restore();
+}
 
-        // --- Core Physics & Logic ---
-        function update() {
-            if (gameState !== 'playing') return;
+function drawHint() {
+  if (!S.hint || S.hintA < 0.02) return;
+  const size = clamp(Math.min(W, H) * 0.019, 10, 13);
+  const y = H - Math.max(26, H * 0.045);
+  const pulse = 0.35 + 0.35 * Math.sin(S.t * 2.0);
+  drawSpaced(S.hint.toUpperCase(), W * 0.5, y, size,
+    size * 0.34, 'rgba(230,230,240,1)', S.hintA * pulse);
+}
 
-            // 1. Hook Logic
-            if (hook.active) {
-                if (!hook.attached) {
-                    // Fly forward
-                    hook.x += hook.vx;
-                    hook.y += hook.vy;
-                    // Check hit
-                    if (isSolid(hook.x, hook.y)) {
-                        hook.attached = true;
-                        for (let i = 0; i < 20; i++) {
-                            particles.push({
-                                x: hook.x,
-                                y: hook.y,
-                                vx: (Math.random() - 0.5) * 10,
-                                vy: (Math.random() - 0.5) * 10 - 2,
-                                size: Math.random() * 6 + 3,
-                                rotation: Math.random() * Math.PI * 2,
-                                vRot: (Math.random() - 0.5) * 0.3,
-                                life: 1.0,
-                                decay: Math.random() * 0.04 + 0.02,
-                                sx: Math.random() * (assets.wall.width - 6),
-                                sy: Math.random() * (assets.wall.height - 6),
-                                sSize: 6
-                            });
-                        }
-                    }
-                } else {
-                    // Pull Player towards hook (Sling mechanic!)
-                    let dx = hook.x - player.x;
-                    let dy = hook.y - player.y;
-                    let dist = Math.hypot(dx, dy);
-                    
-                    if (dist > 10) {
-                        let pullForce = 0.4; // How fast you sling forward
-                        player.vx += (dx / dist) * pullForce;
-                        player.vy += (dy / dist) * pullForce;
-                    }
-                }
+/* =========================================================
+   ACTOR DRAWING
+   ========================================================= */
+function drawActors() {
+  const P = currentMood();
+  if (S.softs) for (const s of S.softs) s.draw(ctx);
+  if (S.ashes) S.ashes.draw(ctx);
+  if (S.spike) S.spike.draw(ctx);
+  for (const p of S.sparks) p.draw(ctx);
+}
 
-                // Update rope physics nodes
-                let count = hook.nodes.length;
-                if (count > 0) {
-                    hook.nodes[0].x = player.x;
-                    hook.nodes[0].y = player.y;
-                    hook.nodes[0].px = player.x;
-                    hook.nodes[0].py = player.y;
+function drawMotes(P, back) {
+  for (let i = 0; i < S.motes.length; i++) {
+    if ((i % 2 === 0) === back) S.motes[i].draw(ctx, i % 3 === 0 ? M.arr(P.accent, 1) : M.arr(P.glow, 1));
+  }
+}
 
-                    hook.nodes[count - 1].x = hook.x;
-                    hook.nodes[count - 1].y = hook.y;
-                    hook.nodes[count - 1].px = hook.x;
-                    hook.nodes[count - 1].py = hook.y;
+/* =========================================================
+   STEP RUNNER
+   ========================================================= */
+function goTo(i) {
+  cur = i;
+  step = STEPS[i];
+  stepTime = 0;
+  revealDone = false;
+  textShown = 0;
+  S.text = step.text || '';
+  S.hint = step.hint || '';
+  S.hintA = S.hint ? 1 : 0;
+  S.holdT = 0;
+  S.holding = false;
+  if (step.mood && step.mood !== S.mood) {
+    S.prevMood = S.mood;
+    S.mood = step.mood;
+    S.moodT = 0;
+    if (M.Moods[S.mood] && M.Moods[S.mood].root) Audio_.setRoot(M.Moods[S.mood].root);
+  }
+  if (M.CHORD[S.mood]) Audio_.setRoot(M.CHORD[S.mood]);
+  layoutCache = null;
+  if (step.enter) step.enter(S);
+}
 
-                    for (let i = 1; i < count - 1; i++) {
-                        let n = hook.nodes[i];
-                        let vx = (n.x - n.px) * 0.98;
-                        let vy = (n.y - n.py) * 0.98 + 0.2;
-                        n.px = n.x;
-                        n.py = n.y;
-                        n.x += vx;
-                        n.y += vy;
+function advance() {
+  if (cur < STEPS.length - 1) {
+    goTo(cur + 1);
+    Audio_.chime(440 + Math.random() * 60, 0.018);
+  } else if (!S.ended) {
+    S.ended = true;
+    S.endT = 0;
+  }
+}
 
-                        if (isSolid(n.x, n.y)) {
-                            for (let r = 1; r < 15; r += 2) {
-                                let resolved = false;
-                                for (let a = 0; a < Math.PI * 2; a += Math.PI / 2) {
-                                    let cx = n.x + Math.cos(a) * r;
-                                    let cy = n.y + Math.sin(a) * r;
-                                    if (!isSolid(cx, cy)) {
-                                        n.x = cx;
-                                        n.y = cy;
-                                        n.px = cx;
-                                        n.py = cy;
-                                        resolved = true;
-                                        break;
-                                    }
-                                }
-                                if (resolved) break;
-                            }
-                        }
-                    }
+function tap() {
+  if (S.ended) {
+    S.ended = false;
+    fadeIn = 1;
+    goTo(0);
+    return;
+  }
+  if (!revealDone) {
+    textShown = textTotal;
+    revealDone = true;
+    return;
+  }
+  if (step && step.gate && !step.gate(S)) {
+    S.shake = Math.min(1, S.shake + 0.25);
+    return;
+  }
+  advance();
+}
 
-                    let totalDist = Math.hypot(hook.x - player.x, hook.y - player.y);
-                    let targetSegmentLength = totalDist / (count - 1);
+/* =========================================================
+   INPUT
+   ========================================================= */
+let downX = 0, downY = 0, downT = 0, moved = false;
 
-                    for (let iter = 0; iter < 4; iter++) {
-                        hook.nodes[0].x = player.x;
-                        hook.nodes[0].y = player.y;
-                        hook.nodes[count - 1].x = hook.x;
-                        hook.nodes[count - 1].y = hook.y;
+function pos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
 
-                        for (let i = 0; i < count - 1; i++) {
-                            let n1 = hook.nodes[i];
-                            let n2 = hook.nodes[i+1];
-                            let dx = n2.x - n1.x;
-                            let dy = n2.y - n1.y;
-                            let d = Math.hypot(dx, dy);
-                            if (d > 0.0001) {
-                                let diff = (d - targetSegmentLength) / d;
-                                if (i !== 0) {
-                                    n1.x += dx * diff * 0.5;
-                                    n1.y += dy * diff * 0.5;
-                                }
-                                if (i + 1 !== count - 1) {
-                                    n2.x -= dx * diff * 0.5;
-                                    n2.y -= dy * diff * 0.5;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+canvas.addEventListener('pointerdown', function (e) {
+  if (!e.isPrimary) return;
+  e.preventDefault();
+  Audio_.unlock();
+  const p = pos(e);
+  downX = p.x; downY = p.y; downT = performance.now(); moved = false;
+  S.dragging = true; S.holding = true;
+  S.pointerX = p.x; S.pointerY = p.y;
+  if (step && step.onDown) step.onDown(S, p.x, p.y);
+}, { passive: false });
 
-            // 2. Player Physics
-            player.vy += 0.25; // Gravity
-            player.vx *= 0.98; // Air friction
-            player.vy *= 0.98;
+canvas.addEventListener('pointermove', function (e) {
+  if (!e.isPrimary || !S.dragging) return;
+  e.preventDefault();
+  const p = pos(e);
+  if (Math.hypot(p.x - downX, p.y - downY) > 12) moved = true;
+  S.pointerX = p.x; S.pointerY = p.y;
+  if (step && step.onDrag) step.onDrag(S, p.x, p.y);
+}, { passive: false });
 
-            player.x += player.vx;
-            player.y += player.vy;
+function release(e) {
+  if (!e.isPrimary) return;
+  S.dragging = false; S.holding = false;
+  if (step && step.onUp) step.onUp(S);
+  if (!moved) tap();
+}
+canvas.addEventListener('pointerup', release);
+canvas.addEventListener('pointercancel', function (e) { S.dragging = false; S.holding = false; });
 
-            // 3. Collisions
-            resolveCollision(player);
+window.addEventListener('keydown', function (e) {
+  if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); Audio_.unlock(); tap(); }
+});
 
-            // Death condition (fell off bottom)
-            if (player.y >= World.height - 20) {
-                gameState = 'gameover';
-                restartBtn.classList.remove('hidden');
-                title.innerText = "You hit The Rock Bottom";
-                title.style.display = 'block';
-            }
+/* =========================================================
+   STORY
+   ========================================================= */
+const STEPS = [];
 
-            // Update particles
-            for (let i = particles.length - 1; i >= 0; i--) {
-                let p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vy += 0.25;
-                p.rotation += p.vRot;
-                p.life -= p.decay;
-                if (p.life <= 0) {
-                    particles.splice(i, 1);
-                }
-            }
+/* ---------- helpers ---------- */
+function stageY() { return H * 0.40; }
+function unit() { return Math.min(W, H); }
 
-            // 4. Camera Follow (Smooth Lerp)
-            let targetCamX = player.x - width / 3;
-            let targetCamY = player.y - height / 2;
-            
-            // Clamp camera to world bounds
-            targetCamX = Math.max(0, Math.min(targetCamX, World.width - width));
-            targetCamY = Math.max(0, Math.min(targetCamY, World.height - height));
+function burst(x, y, color, n, power) {
+  for (let i = 0; i < n; i++) {
+    S.sparks.push(new M.Spark(x, y, color, {
+      angle: rand(0, TAU),
+      speed: rand(30, power || 190),
+      life: rand(0.35, 1.15),
+      r: rand(0.9, 2.6)
+    }));
+  }
+}
 
-            camera.x += (targetCamX - camera.x) * 0.1;
-            camera.y += (targetCamY - camera.y) * 0.1;
-        }
+function makeSpike(x, y, size) {
+  const sp = new M.Spike({
+    x: x, y: y,
+    size: size,
+    color: '#ffd9a0',
+    edge: '#fff6e2'
+  });
+  sp.homeX = x; sp.homeY = y;
+  return sp;
+}
 
-        // --- Rendering ---
-        function draw() {
-            ctx.fillStyle = '#0a0a11';
-            ctx.fillRect(0, 0, width, height);
+/* =========================================================
+   TITLE
+   ========================================================= */
+STEPS.push({
+  titleMode: true,
+  mood: 'birth',
+  enter: function (S) {
+    S.softs = []; S.sparks = [];
+    S.spike = makeSpike(W * 0.5, stageY(), unit() * 0.075);
+    S.spike.alpha = 0;
+    S.spike.rot = 0;
+    S.text = '';
+    S.hint = 'tap';
+  },
+  update: function (S, dt) {
+    S.spike.alpha = Math.min(1, S.spike.alpha + dt * 0.4);
+    S.spike.rot += dt * 0.14;
+    S.spike.homeX = W * 0.5;
+    S.spike.homeY = stageY();
+    S.spike.x = W * 0.5;
+    S.spike.y = stageY();
+  }
+});
 
-            if (gameState === 'menu') return;
+/* =========================================================
+   I — THE SOFT WORLD
+   ========================================================= */
+STEPS.push({
+  mood: 'birth',
+  text: 'Before anything, there was a warm dark.\nAnd in the warm dark, shapes began.',
+  enter: function (S) {
+    S.sparks = [];
+    S.softs = [];
+    const cols = ['#7fb2ff', '#8fe0d0', '#c9a6ff', '#ffb0c8', '#a3d9a5'];
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const a = Math.PI + (i / (n - 1)) * Math.PI;
+      const s = new M.Soft({
+        x: W * 0.5 + Math.cos(a) * W * 0.36,
+        y: H * 0.30 - Math.sin(a) * H * 0.11,
+        r: unit() * rand(0.036, 0.055),
+        color: cols[i]
+      });
+      s.driftAmp = rand(2, 7);
+      S.softs.push(s);
+    }
+    S.spike.homeX = W * 0.5;
+    S.spike.homeY = H * 0.52;
+    S.spike.x = W * 0.5;
+    S.spike.y = H * 0.52;
+    S.spike.sharp = 1;
+    S.spike.alpha = 1;
+    S.spike.rot = 0;
+  }
+});
 
-            ctx.save();
-            // Apply camera transform
-            ctx.translate(-camera.x, -camera.y);
+STEPS.push({
+  mood: 'birth',
+  text: 'Most of them were round.'
+});
 
-            // Parallax Background
-            // Note: In a real advanced setup we'd split layers, but here we just draw the merged background slightly offset
-            ctx.drawImage(bgCanvas, camera.x * 0.5, camera.y * 0.5); 
-            
-            // Foreground / Collisions
-            ctx.drawImage(collisionCanvas, 0, 0);
+STEPS.push({
+  mood: 'birth',
+  text: 'They rolled into one another and nothing broke.\nThey bumped, and bounced, and made a sound like laughing.'
+});
 
-            // Draw Hook Line
-            if (hook.active && hook.nodes && hook.nodes.length > 0) {
-                ctx.beginPath();
-                ctx.moveTo(hook.nodes[0].x, hook.nodes[0].y);
-                for (let i = 1; i < hook.nodes.length; i++) {
-                    ctx.lineTo(hook.nodes[i].x, hook.nodes[i].y);
-                }
-                ctx.strokeStyle = '#8899aa';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Draw Hook head
-                ctx.save();
-                ctx.translate(hook.x, hook.y);
-                let lastNode = hook.nodes[hook.nodes.length - 2] || hook.nodes[0];
-                let angle = Math.atan2(hook.y - lastNode.y, hook.x - lastNode.x);
-                ctx.rotate(angle);
-                ctx.drawImage(assets.hook, -assets.hook.width/2, -assets.hook.height/2);
-                ctx.restore();
-            }
+STEPS.push({
+  mood: 'birth',
+  text: 'You were not round.'
+});
 
-            // Draw Player
-            ctx.save();
-            ctx.translate(player.x, player.y);
-            // Tilt player based on speed
-            ctx.rotate(player.vx * 0.05);
-            ctx.drawImage(assets.player, -assets.player.width/2, -assets.player.height/2);
-            ctx.restore();
+STEPS.push({
+  mood: 'birth',
+  text: 'You were three straight lines and three points.\nAnd the first time you touched someone, they flinched.'
+});
 
-            // Draw Particle
-            for (let p of particles) {
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate(p.rotation);
-                ctx.globalAlpha = p.life;
-                ctx.imageSmoothingEnabled = false;
-                if (assets.wall.complete && assets.wall.naturalWidth > 0) {
-                    ctx.drawImage(assets.wall, p.sx, p.sy, p.sSize, p.sSize, -p.size/2, -p.size/2, p.size, p.size);
-                } else {
-                    ctx.fillStyle = '#885533';
-                    ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
-                }
-                ctx.restore();
-            }
+/* --- interaction: reach out --- */
+STEPS.push({
+  mood: 'birth',
+  text: 'Reach out.',
+  hint: 'drag toward one of them',
+  enter: function (S) { S.touched = false; },
+  onDrag: function (S, x, y) {
+    S.spike.x = clamp(x, 20, W - 20);
+    S.spike.y = clamp(y, 20, H - 20);
+    for (const s of S.softs) {
+      if (s.hurtYet) continue;
+      if (dist(S.spike.x, S.spike.y, s.px, s.py) < s.r + S.spike.size * 0.55) {
+        s.hurtYet = true;
+        s.flinch = 1;
+        s.addCrack(Math.atan2(S.spike.y - s.py, S.spike.x - s.px));
+        const ang = Math.atan2(s.py - S.spike.y, s.px - S.spike.x);
+        s.x += Math.cos(ang) * 26;
+        s.y += Math.sin(ang) * 26;
+        burst(s.px, s.py, '#ff9fae', 16, 220);
+        S.shake = 1;
+        S.flash = 0.5;
+        S.flashCol = '#ffd0d8';
+        S.touched = true;
+        Audio_.chime(196, 0.05);
+      }
+    }
+  },
+  gate: function (S) { return S.touched; }
+});
 
-            ctx.restore();
-        }
+STEPS.push({
+  mood: 'break',
+  text: 'They flinched.\nAnd there was a mark on them, exactly the shape of you.'
+});
 
-        function loop() {
-            update();
-            draw();
-            requestAnimationFrame(loop);
-        }
+STEPS.push({
+  mood: 'break',
+  text: 'You did not mean to.\nYou never meant to.'
+});
 
-        // --- Inputs (iPad Touch & Mouse) ---
-        function handlePointerDown(x, y) {
-            if (gameState !== 'playing') return;
-            // Calculate world coordinates
-            let worldX = x + camera.x;
-            let worldY = y + camera.y;
+STEPS.push({
+  mood: 'break',
+  text: 'But meaning it was never the problem.'
+});
 
-            let angle = Math.atan2(worldY - player.y, worldX - player.x);
-            hook.active = true;
-            hook.attached = false;
-            hook.x = player.x;
-            hook.y = player.y;
-            hook.vx = Math.cos(angle) * hook.speed;
-            hook.vy = Math.sin(angle) * hook.speed;
+/* =========================================================
+   II — LEARNING
+   ========================================================= */
+STEPS.push({
+  mood: 'dull',
+  text: 'So you learned.',
+  enter: function (S) {
+    S.sparks = [];
+    S.softs.forEach(function (s, i) {
+      s.homeX = W * 0.5 + Math.cos(i * 1.28) * W * 0.34;
+      s.homeY = H * 0.30 + Math.sin(i * 1.28) * H * 0.10;
+      s.hurtYet = true;
+    });
+    S.spike.homeX = W * 0.5;
+    S.spike.homeY = H * 0.60;
+  }
+});
 
-            hook.nodes = [];
-            let nodeCount = 30;
-            for (let i = 0; i < nodeCount; i++) {
-                hook.nodes.push({ x: player.x, y: player.y, px: player.x, py: player.y });
-            }
-        }
+STEPS.push({
+  mood: 'dull',
+  text: 'You learned to stand one arm\'s length away.\nThen two.'
+});
 
-        function handlePointerUp() {
-            hook.active = false;
-            hook.attached = false;
-        }
+STEPS.push({
+  mood: 'dull',
+  text: 'You learned to be funny, so that people would come close\nwithout actually coming close.'
+});
 
-        // Touch events
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
-        }, {passive: false});
-        
-        canvas.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            handlePointerUp();
-        });
+STEPS.push({
+  mood: 'dull',
+  text: 'Everyone loves a sharp thing from across the room.'
+});
 
-        // Mouse events (for desktop testing)
-        canvas.addEventListener('mousedown', (e) => {
-            handlePointerDown(e.clientX, e.clientY);
-        });
-        canvas.addEventListener('mouseup', handlePointerUp);
+STEPS.push({
+  mood: 'dull',
+  text: 'At night you pressed your points into the ground and tried to wear them down.\nThe ground did not care.\nThe points stayed.',
+  enter: function (S) {
+    S.spike.rot = Math.PI;
+    S.spike.homeY = H * 0.48;
+    S.spike.y = H * 0.48;
+  }
+});
 
-        // --- Game State Management ---
-        function startGame() {
-            startBtn.classList.add('hidden');
-            restartBtn.classList.add('hidden');
-            title.style.display = 'none';
-            
-            // Wait for images to be loaded before generating level
-            setTimeout(() => {
-                ctx.imageSmoothingEnabled = false;
-                generateLevel();
-                
-                player.x = 300;
-                player.y = World.height / 2;
-                player.vx = 0;
-                player.vy = 0;
-                
-                hook.active = false;
-                gameState = 'playing';
-            }, 100);
-        }
+/* =========================================================
+   III — WREN
+   ========================================================= */
+STEPS.push({
+  mood: 'love',
+  text: 'Then there was Wren.',
+  enter: function (S) {
+    S.softs = [];
+    S.sparks = [];
+    const wren = new M.Soft({
+      x: W * 0.5, y: H * 0.32,
+      r: unit() * 0.075,
+      color: '#ffc7d1'
+    });
+    wren.driftAmp = 2.4;
+    S.softs.push(wren);
+    S.spike.homeX = W * 0.5;
+    S.spike.homeY = H * 0.62;
+    S.spike.x = S.spike.homeX;
+    S.spike.y = S.spike.homeY;
+    S.spike.rot = 0;
+    S.spike.sharp = 1;
+  }
+});
 
-        startBtn.addEventListener('click', startGame);
-        restartBtn.addEventListener('click', startGame);
+STEPS.push({
+  mood: 'love',
+  text: 'Wren was round. Wren was the roundest thing you had ever seen,\nand when she laughed the whole room went soft.'
+});
 
-        // Start Loop
-        requestAnimationFrame(loop);
+STEPS.push({
+  mood: 'love',
+  text: 'Wren was not afraid of you.\nThat was the terrible part.'
+});
+
+STEPS.push({
+  mood: 'love',
+  text: 'She came close. She said: I know what you are.\nI am not going anywhere.'
+});
+
+STEPS.push({
+  mood: 'love',
+  text: 'Move closer.',
+  hint: 'drag yourself toward her',
+  enter: function (S) {
+    S.danger = 0;
+  },
+  onDrag: function (S, x, y) {
+    const w = S.softs[0];
+    const dx = x - S.spike.x, dy = y - S.spike.y;
+    S.spike.x = clamp(x, 20, W - 20);
+    S.spike.y = clamp(y, 20, H - 20);
+    const d = dist(S.spike.x, S.spike.y, w.px, w.py);
+    const gap = d - (w.r + S.spike.size * 0.6);
+    S.danger = clamp(1 - gap / (unit() * 0.16), 0, 1);
+    if (S.danger > 0.92) {
+      if (!w.hurtYet) {
+        w.hurtYet = true;
+        w.flinch = 1;
+        w.addCrack(Math.atan2(S.spike.y - w.py, S.spike.x - w.px) + 0.4);
+        w.addCrack(Math.atan2(S.spike.y - w.py, S.spike.x - w.px) - 0.6);
+        burst(w.px, w.py, '#ffb0c0', 26, 260);
+        S.shake = 1.4;
+        S.flash = 0.75;
+        S.flashCol = '#ffd6de';
+        S.touched = true;
+        Audio_.chime(146, 0.07);
+      }
+    }
+  },
+  gate: function (S) { return S.touched === true; }
+});
+
+STEPS.push({
+  mood: 'break',
+  text: 'She did not scream.'
+});
+
+STEPS.push({
+  mood: 'break',
+  text: 'She said: it\'s okay.\nShe said it with a crack running down her side.\nShe said it while looking at you.'
+});
+
+STEPS.push({
+  mood: 'break',
+  text: 'And that was when you understood what you were.'
+});
+
+/* =========================================================
+   IV — THE DULLING
+   ========================================================= */
+STEPS.push({
+  mood: 'dull',
+  text: 'You left that night.',
+  enter: function (S) {
+    S.sparks = [];
+    S.softs = [];
+    S.spike.homeX = W * 0.5;
+    S.spike.homeY = H * 0.38;
+    S.spike.x = W * 0.5;
+    S.spike.y = H * 0.38;
+    S.spike.sharp = 1;
+    S.spike.rot = 0;
+  }
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'You found a stone, and you pressed yourself against it,\nand you dragged, and you dragged.',
+  hint: 'hold',
+  enter: function (S) { S.holdT = 0; },
+  update: function (S, dt) {
+    if (S.holding && S.holdT < 1) {
+      S.holdT = Math.min(1, S.holdT + dt * 0.26);
+      S.spike.sharp = 1 - S.holdT * 0.88;
+      S.shake = Math.min(1, S.shake + dt * 2.2);
+      S.spike.rot += dt * 3.2 * (1 - S.holdT * 0.7);
+      if (Math.random() < dt * 26) {
+        burst(S.spike.x + rand(-1, 1) * S.spike.size * 0.5,
+              S.spike.y + rand(-1, 1) * S.spike.size * 0.5,
+              Math.random() < 0.4 ? '#ffd9a0' : '#ff9fae', 2, 130);
+      }
+      if (Math.random() < dt * 5) Audio_.chime(rand(90, 140), 0.012);
+    }
+  },
+  gate: function (S) { return S.holdT >= 1; }
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'It took a long time.'
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'Your points went first.\nThen your edges.\nThen the shape of you.'
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'You thought: if I am not sharp, I can be loved.'
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'You did not think: I will not be me.'
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'When you went back, Wren looked at you for a long moment.',
+  enter: function (S) {
+    const w = new M.Soft({ x: W * 0.5, y: H * 0.28, r: unit() * 0.075, color: '#ffc7d1' });
+    w.driftAmp = 1.4;
+    w.hurtYet = true;
+    w.addCrack(0.8); w.cracks[0].prog = 1;
+    w.addCrack(2.6); w.cracks[1].prog = 1;
+    S.softs = [w];
+    S.spike.homeY = H * 0.60;
+    S.spike.y = H * 0.60;
+  }
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'She said: I\'m sorry. Do I know you?'
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'You said yes.\nShe said she was sorry. She said it kindly.'
+});
+
+STEPS.push({
+  mood: 'dull',
+  text: 'Kindly is a way of being very far away.'
+});
+
+/* =========================================================
+   V — DISTANCE
+   ========================================================= */
+STEPS.push({
+  mood: 'exile',
+  text: 'So you went to the edge of the world.',
+  enter: function (S) {
+    S.softs = [];
+    S.sparks = [];
+    S.stars = null;
+    S.spike.homeX = W * 0.5;
+    S.spike.homeY = H * 0.42;
+    S.spike.x = W * 0.5;
+    S.spike.y = H * 0.42;
+    S.spike.sharp = 0.12;
+    S.spike.rot = 0;
+    S.spike.trail = [];
+  },
+  update: function (S, dt) {
+    S.spike.sharp = Math.min(1, S.spike.sharp + dt * 0.075);
+  }
+});
+
+STEPS.push({
+  mood: 'exile',
+  text: 'You made yourself small. You made yourself bright.'
+});
+
+STEPS.push({
+  mood: 'exile',
+  text: 'You became a point of light in a very large dark,\nand people looked up at you and loved you.'
+});
+
+STEPS.push({
+  mood: 'exile',
+  text: 'It was safe, because they were very far away.',
+  enter: function (S) {
+    S.spike.size = unit() * 0.045;
+  }
+});
+
+STEPS.push({
+  mood: 'exile',
+  text: 'The edges came back.\nThey always come back.\nThat is the entire problem with being a shape.',
+  update: function (S, dt) {
+    S.spike.sharp = Math.min(1, S.spike.sharp + dt * 0.05);
+  }
+});
+
+STEPS.push({
+  mood: 'exile',
+  text: 'It was enough.'
+});
+
+STEPS.push({
+  mood: 'exile',
+  text: 'It was not enough.'
+});
+
+/* =========================================================
+   VI — ANOTHER
+   ========================================================= */
+STEPS.push({
+  mood: 'two',
+  text: 'Then one night, something moved at the edge of your light.',
+  enter: function (S) {
+    S.sparks = [];
+    S.spike.homeX = W * 0.34;
+    S.spike.homeY = H * 0.44;
+    S.spike.x = W * 0.34;
+    S.spike.y = H * 0.44;
+    S.spike.size = unit() * 0.062;
+    S.spike.sharp = 1;
+    S.spike.rot = -0.25;
+    S.ashes = makeSpike(W * 0.78, H * 0.44, unit() * 0.062);
+    S.ashes.color = '#b9c6ff';
+    S.ashes.edge = '#e6ecff';
+    S.ashes.rot = 0.3;
+    S.ashes.alpha = 0;
+    S.ashesWanted = false;
+  },
+  update: function (S, dt) {
+    S.ashes.alpha = Math.min(1, S.ashes.alpha + dt * 0.35);
+    S.ashes.x += (S.ashes.homeX - S.ashes.x) * Math.min(1, dt * 2.2);
+    S.ashes.y += (S.ashes.homeY - S.ashes.y) * Math.min(1, dt * 2.2);
+  }
+});
+
+STEPS.push({
+  mood: 'two',
+  text: 'She had points.\nThree of them, and they were sharp,\nand they had been sharp for a very long time.'
+});
+
+STEPS.push({
+  mood: 'two',
+  text: 'Neither of you said anything for a while.\nThere was nothing to say that the other did not already know.'
+});
+
+STEPS.push({
+  mood: 'two',
+  text: 'Her name was Ashen.\nShe had hurt everyone she had ever loved.\nShe had counted them.'
+});
+
+STEPS.push({
+  mood: 'two',
+  text: 'She said: I am not going to touch you.'
+});
+
+STEPS.push({
+  mood: 'two',
+  text: 'You said: I know.'
+});
+
+STEPS.push({
+  mood: 'two',
+  text: 'You stayed exactly one arm\'s length apart for a year.',
+  update: function (S, dt) {
+    const breathe = Math.sin(S.t * 0.5) * 4;
+    S.spike.homeX = W * 0.40 + breathe;
+    S.ashes.homeX = W * 0.62 - breathe;
+  }
+});
+
+/* =========================================================
+   VII — THE SHAPE OF TWO
+   ========================================================= */
+STEPS.push({
+  mood: 'two',
+  text: 'Then, one night, she said: flat sides.',
+  enter: function (S) {
+    S.sparks = [];
+    S.spike.homeX = W * 0.30;
+    S.spike.homeY = H * 0.42;
+    S.ashes.homeX = W * 0.74;
+    S.ashes.homeY = H * 0.42;
+    S.ashes.alpha = 1;
+    S.spike.sharp = 1;
+    S.ashes.sharp = 1;
+  },
+  update: function (S, dt) {
+    S.spike.x += (S.spike.homeX - S.spike.x) * Math.min(1, dt * 2);
+    S.spike.y += (S.spike.homeY - S.spike.y) * Math.min(1, dt * 2);
+    S.ashes.x += (S.ashes.homeX - S.ashes.x) * Math.min(1, dt * 2);
+    S.ashes.y += (S.ashes.homeY - S.ashes.y) * Math.min(1, dt * 2);
+  }
+});
+
+STEPS.push({
+  mood: 'two',
+  text: 'A triangle has three straight edges.\nSo does another triangle.'
+});
+
+STEPS.push({
+  mood: 'two',
+  text: 'Lie down. Edge to edge.\nFlat against flat.',
+  hint: 'drag her to you',
+  enter: function (S) {
+    S.aligned = false;
+    S.ashes.homeX = W * 0.80;
+    S.ashes.homeY = H * 0.42;
+    S.ashes.x = W * 0.80;
+    S.ashes.y = H * 0.42;
+    S.ashes.rot = 0.3;
+    S.spike.homeX = W * 0.32;
+    S.spike.homeY = H * 0.42;
+    S.spike.x = W * 0.32;
+    S.spike.y = H * 0.42;
+    S.spike.rot = 0;
+  },
+  onDrag: function (S, x, y) {
+    if (S.aligned) return;
+    S.ashes.x = clamp(x, 40, W - 40);
+    S.ashes.y = clamp(y, 40, H - 40);
+    S.ashes.rot = lerp(S.ashes.rot, 0, 0.08);
+
+    const R = S.spike.size;
+    const tx = S.spike.x;
+    const ty = S.spike.y + R;
+    const d = dist(S.ashes.x, S.ashes.y, tx, ty);
+    if (d < R * 0.62) {
+      S.aligned = true;
+      S.ashes.x = tx;
+      S.ashes.y = ty;
+      S.ashes.rot = Math.PI;
+      S.ashes.homeX = tx;
+      S.ashes.homeY = ty;
+      S.spike.rot = 0;
+      S.spike.homeX = tx;
+      S.spike.homeY = ty - R;
+      S.spike.x = tx;
+      S.spike.y = ty - R;
+      S.flash = 0.55;
+      S.flashCol = '#ffe6c4';
+      burst(tx, ty, '#ffd9a0', 30, 170);
+      Audio_.chime(330, 0.05);
+      Audio_.chime(495, 0.035);
+    }
+  },
+  gate: function (S) { return S.aligned; }
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'And it was warm.'
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'It was the first time in your whole life\nthat being close did not cost anything.'
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'Her points stuck out into the world. So did yours.\nThe world did not matter.'
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'You stayed like that.'
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'Two sharp things, making one soft thing.'
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'Between you: no gap, no wound, no blood, no distance.'
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'And nobody who saw you from far away\ncould tell where you ended and she began.'
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'They never once held each other.',
+  endBeat: true
+});
+
+STEPS.push({
+  mood: 'dawn',
+  text: 'They were never once apart.',
+  endBeat: true
+});
+
+/* =========================================================
+   UPDATE
+   ========================================================= */
+function updateActors(dt) {
+  if (S.spike) S.spike.update(dt);
+  if (S.ashes) S.ashes.update(dt);
+  for (const s of S.softs) s.update(dt);
+  for (let i = S.sparks.length - 1; i >= 0; i--) {
+    S.sparks[i].update(dt);
+    if (S.sparks[i].dead) S.sparks.splice(i, 1);
+  }
+  for (const m of S.motes) m.update(dt, S.t);
+}
+
+function update(dt) {
+  S.t += dt;
+  S.moodT = Math.min(1, S.moodT + dt / 2.6);
+  stepTime += dt;
+
+  if (S.shake > 0) S.shake = Math.max(0, S.shake - dt * 2.6);
+  if (S.flash > 0) S.flash = Math.max(0, S.flash - dt * 1.9);
+
+  // text reveal
+  if (S.text) {
+    const fs = clamp(Math.min(W, H) * 0.0295, 15, 22);
+    const font = '300 ' + fs + 'px Georgia, "Times New Roman", serif';
+    const maxW = Math.min(W * 0.82, 600);
+    const lay = getLayout(S.text, font, maxW);
+    textTotal = lay.total;
+    if (!revealDone) {
+      textShown += dt * 46;
+      if (textShown >= textTotal) {
+        textShown = textTotal;
+        revealDone = true;
+      }
+    }
+  } else {
+    revealDone = true;
+  }
+
+  // hint fade
+  const targetHint = S.hint ? 1 : 0;
+  S.hintA += (targetHint - S.hintA) * Math.min(1, dt * 3);
+
+  if (step && step.update) step.update(S, dt);
+  updateActors(dt);
+
+  // end sequence
+  if (S.ended) {
+    S.endT += dt;
+    if (S.endT > 9) {
+      S.endT = 0;
+      S.ended = false;
+      goTo(0);
+    }
+  }
+}
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+function render() {
+  const P = currentMood();
+
+  ctx.save();
+
+  if (S.shake > 0.001) {
+    const s = S.shake * S.shake * 9;
+    ctx.translate(rand(-s, s), rand(-s, s));
+  }
+
+  drawBackground(P);
+  drawMotes(P, true);
+
+  if (step && step.titleMode) {
+    // Title screen
+    const a = S.spike ? S.spike.alpha : 1;
+    const ty = H * 0.24;
+    drawSpaced('THE SHAPE OF TWO', W * 0.5, ty, clamp(unit() * 0.052, 22, 44),
+      clamp(unit() * 0.014, 4, 12), 'rgba(240,238,248,1)', a * 0.95);
+    drawSpaced('a story about a triangle', W * 0.5, ty + clamp(unit() * 0.055, 26, 50),
+      clamp(unit() * 0.020, 11, 15), clamp(unit() * 0.006, 1.5, 4),
+      'rgba(190,190,215,1)', a * 0.62);
+  } else {
+    drawActors();
+  }
+
+  drawMotes(P, false);
+  drawVignette();
+
+  // title-mode triangle is drawn between back motes and vignette
+  if (step && step.titleMode && S.spike) {
+    S.spike.draw(ctx);
+  }
+
+  ctx.restore();
+
+  // danger vignette (chapter III)
+  if (S.danger > 0.01 && !S.touched) {
+    const d = S.danger;
+    const r = ctx.createRadialGradient(W * 0.5, H * 0.45, Math.min(W, H) * 0.15,
+                                        W * 0.5, H * 0.45, Math.max(W, H) * 0.7);
+    r.addColorStop(0, 'rgba(255,90,110,0)');
+    r.addColorStop(1, 'rgba(255,60,90,' + (0.34 * d) + ')');
+    ctx.fillStyle = r;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // story text
+  if (!(step && step.titleMode)) drawStoryText();
+  else if (S.text) drawStoryText();
+
+  // hint
+  drawHint();
+
+  // flash
+  if (S.flash > 0.001) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = M.rs(S.flashCol, S.flash * 0.42);
+    ctx.fillRect(0, 0, W, H);
+    ctx.restore();
+  }
+
+  // ending overlay
+  if (S.ended) {
+    const a = clamp(S.endT / 2.6, 0, 1) * clamp((9 - S.endT) / 2.4, 0, 1);
+    ctx.fillStyle = 'rgba(4,4,10,' + (a * 0.82) + ')';
+    ctx.fillRect(0, 0, W, H);
+    if (S.endT > 3.2) {
+      const ta = clamp((S.endT - 3.2) / 1.8, 0, 1) * clamp((9 - S.endT) / 2.0, 0, 1);
+      drawSpaced('the end', W * 0.5, H * 0.5, clamp(unit() * 0.022, 12, 16),
+        clamp(unit() * 0.010, 3, 8), 'rgba(230,228,240,1)', ta * 0.7);
+    }
+  }
+
+  // intro fade
+  if (fadeIn > 0.001) {
+    ctx.fillStyle = 'rgba(4,4,10,' + fadeIn + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+/* =========================================================
+   LOOP
+   ========================================================= */
+let last = performance.now();
+function frame(now) {
+  let dt = (now - last) / 1000;
+  last = now;
+  if (dt > 0.05) dt = 0.05;
+  if (dt < 0) dt = 0;
+
+  if (fadeIn > 0) fadeIn = Math.max(0, fadeIn - dt * 0.35);
+
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+
+/* =========================================================
+   RESIZE / BOOT
+   ========================================================= */
+function onResize() {
+  S.motes = [];
+  for (let i = 0; i < 44; i++) S.motes.push(new M.Mote(W, H, true));
+  S.stars = null;
+  layoutCache = null;
+  if (step && step.enter) {
+    const wasTitle = !!step.titleMode;
+    step.enter(S);
+    if (!wasTitle && S.spike) S.spike.alpha = 1;
+  }
+}
+
+let resizeTimer = null;
+window.addEventListener('resize', function () {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(resize, 180);
+});
+window.addEventListener('orientationchange', function () {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(resize, 320);
+});
+
+// boot
+resize();
+S.motes = [];
+for (let i = 0; i < 44; i++) S.motes.push(new M.Mote(W, H, true));
+goTo(0);
+requestAnimationFrame(function (t) { last = t; requestAnimationFrame(frame); });
+
+})();
     </script>
 </body>
 
