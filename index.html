@@ -34,10 +34,14 @@
   <symbol id="i-hdd" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="M3.5 12h17"/><circle cx="8" cy="15.2" r="1"/></symbol>
   <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.8 12S6.6 6 12 6s9.2 6 9.2 6-3.8 6-9.2 6-9.2-6-9.2-6z"/><circle cx="12" cy="12" r="2.6"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.6 4.6 4.4L19 7.4"/></symbol>
+  <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="8.6" cy="9.6" r="1.6"/><path d="m4 17 5-5 4 4 3-3 4 4"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.8-.7 1.8-1.6 0-.9-.6-1.5-.6-2.3 0-.9.7-1.6 1.6-1.6h1.6a4.1 4.1 0 0 0 4.1-4.1C20.5 6.8 16.7 3.5 12 3.5z"/><circle cx="7.6" cy="11" r="1.1" fill="currentColor" stroke="none"/><circle cx="10.3" cy="7.6" r="1.1" fill="currentColor" stroke="none"/><circle cx="14.4" cy="7.7" r="1.1" fill="currentColor" stroke="none"/><circle cx="7.9" cy="15" r="1.1" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h2"/><path d="M7.5 8v8"/><path d="M12 5v14"/><path d="M16.5 8v8"/><path d="M21 12h-2"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M5 4.5v15"/><circle cx="5" cy="14.5" r="2"/><path d="M12 4.5v15"/><circle cx="12" cy="8.5" r="2"/><path d="M19 4.5v15"/><circle cx="19" cy="12.5" r="2"/></symbol>
 </svg>
 
 <!-- ============================================================
-     AMBIENT SCENE
+     AMBIENT SCENE + THEME WASH + ART STAGE
      ============================================================ -->
 <div class="scene" aria-hidden="true">
   <div class="sky"></div>
@@ -53,6 +57,17 @@
   </div>
   <div class="grain"></div>
 </div>
+
+<div class="theme-wash" id="themeWash" aria-hidden="true"></div>
+
+<div class="art-stage" id="artStage" aria-hidden="true">
+  <div class="art-frame" id="artFrame">
+    <div class="art-fallback" id="artFallback"></div>
+    <img class="art-image" id="artImage" alt="">
+    <div class="art-ring"></div>
+  </div>
+</div>
+
 <div class="vignette" aria-hidden="true"></div>
 
 <!-- ============================================================
@@ -79,6 +94,8 @@
   <button id="railShuffle" title="Shuffle" aria-label="Shuffle"><svg class="ic"><use href="#i-shuffle"/></svg></button>
   <button id="railRepeat" title="Repeat" aria-label="Repeat"><svg class="ic"><use href="#i-repeat"/></svg></button>
   <hr>
+  <button id="railArt" title="Toggle album art" aria-label="Toggle album art"><svg class="ic"><use href="#i-image"/></svg></button>
+  <button id="railTheme" title="Auto theme from art" aria-label="Auto theme from art"><svg class="ic"><use href="#i-palette"/></svg></button>
   <button id="railFocus" title="Focus mode" aria-label="Focus mode"><svg class="ic"><use href="#i-eye"/></svg></button>
   <button id="railSettings" title="Settings" aria-label="Settings"><svg class="ic"><use href="#i-settings"/></svg></button>
 </nav>
@@ -179,7 +196,7 @@
       <span class="gear"><svg class="ic"><use href="#i-settings"/></svg></span>
       <div>
         <h2>Settings</h2>
-        <small>Playback · Interface · Storage</small>
+        <small>Playback · Sound · Artwork · Interface</small>
       </div>
       <span class="spacer"></span>
       <button class="settings-close" id="btnCloseSettings" aria-label="Close settings"><svg class="ic"><use href="#i-close"/></svg></button>
@@ -187,6 +204,7 @@
 
     <div class="settings-body">
 
+      <!-- ==================== PLAYBACK ==================== -->
       <div class="sgroup">
         <div class="sgroup-head"><svg class="ic"><use href="#i-play"/></svg><span>Playback</span><i class="line"></i></div>
 
@@ -232,6 +250,106 @@
         </div>
       </div>
 
+      <!-- ==================== SOUND ENHANCEMENT ==================== -->
+      <div class="sgroup">
+        <div class="sgroup-head"><svg class="ic"><use href="#i-sliders"/></svg><span>Sound enhancement</span><i class="line"></i></div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-wave"/></svg></span>
+            <div><div class="setting-name">Enhancer</div><div class="setting-desc">Route audio through the equaliser chain.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setEnhance" role="switch" aria-checked="true"></button></div>
+        </div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-sliders"/></svg></span>
+            <div><div class="setting-name">Preset</div><div class="setting-desc">Quick tone curve.</div></div>
+          </div>
+          <div class="setting-control">
+            <div class="quality-selector" id="setPreset">
+              <button data-preset="flat">Flat</button>
+              <button data-preset="bass">Bass</button>
+              <button data-preset="vocal">Vocal</button>
+              <button data-preset="warm">Warm</button>
+              <button data-preset="bright">Bright</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-volume"/></svg></span>
+            <div><div class="setting-name">Bass</div><div class="setting-desc">Low-frequency shelf — warmth and punch.</div></div>
+          </div>
+          <div class="setting-control">
+            <input class="range setting-slider" type="range" id="setBass" min="-10" max="10" step="0.5" value="0">
+            <span class="setting-value" id="setBassVal">0.0 dB</span>
+          </div>
+        </div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-volume"/></svg></span>
+            <div><div class="setting-name">Midrange</div><div class="setting-desc">Vocal presence and body.</div></div>
+          </div>
+          <div class="setting-control">
+            <input class="range setting-slider" type="range" id="setMid" min="-10" max="10" step="0.5" value="0">
+            <span class="setting-value" id="setMidVal">0.0 dB</span>
+          </div>
+        </div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-volume"/></svg></span>
+            <div><div class="setting-name">Treble</div><div class="setting-desc">Air, sparkle and detail.</div></div>
+          </div>
+          <div class="setting-control">
+            <input class="range setting-slider" type="range" id="setTreble" min="-10" max="10" step="0.5" value="0">
+            <span class="setting-value" id="setTrebleVal">0.0 dB</span>
+          </div>
+        </div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-wave"/></svg></span>
+            <div><div class="setting-name">Compressor</div><div class="setting-desc">Even out loud and quiet passages.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setCompressor" role="switch" aria-checked="false"></button></div>
+        </div>
+      </div>
+
+      <!-- ==================== ALBUM ART ==================== -->
+      <div class="sgroup">
+        <div class="sgroup-head"><svg class="ic"><use href="#i-image"/></svg><span>Album artwork</span><i class="line"></i></div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-image"/></svg></span>
+            <div><div class="setting-name">Show artwork</div><div class="setting-desc">Display the cover art centre stage.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setArtVisible" role="switch" aria-checked="true"></button></div>
+        </div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-palette"/></svg></span>
+            <div><div class="setting-name">Auto theme from art</div><div class="setting-desc">Sample the cover and tint the whole interface.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setAutoTheme" role="switch" aria-checked="true"></button></div>
+        </div>
+
+        <div class="setting">
+          <div class="setting-info">
+            <span class="setting-icon"><svg class="ic"><use href="#i-wave"/></svg></span>
+            <div><div class="setting-name">Pulse edges</div><div class="setting-desc">Frame glows with the music.</div></div>
+          </div>
+          <div class="setting-control"><button class="switch" id="setPulse" role="switch" aria-checked="true"></button></div>
+        </div>
+      </div>
+
+      <!-- ==================== INTERFACE ==================== -->
       <div class="sgroup">
         <div class="sgroup-head"><svg class="ic"><use href="#i-eye"/></svg><span>Interface</span><i class="line"></i></div>
 
@@ -268,6 +386,7 @@
         </div>
       </div>
 
+      <!-- ==================== STORAGE ==================== -->
       <div class="sgroup">
         <div class="sgroup-head"><svg class="ic"><use href="#i-hdd"/></svg><span>Storage</span><i class="line"></i></div>
 
@@ -325,24 +444,18 @@
 'use strict';
 
 /* ============================================================
-   TINY HELPERS
+   HELPERS
    ============================================================ */
 const $  = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.prototype.slice.call((r || document).querySelectorAll(s));
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const toArray = (list) => {
-  const out = [];
-  if (!list) return out;
-  for (let i = 0; i < list.length; i++) out.push(list[i]);
-  return out;
-};
+const toArray = (list) => { const out = []; if (!list) return out; for (let i = 0; i < list.length; i++) out.push(list[i]); return out; };
 const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
 const uid = () => 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 function fmtTime(s) {
   if (!isFinite(s) || s < 0) s = 0;
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return m + ':' + (sec < 10 ? '0' : '') + sec;
 }
 function fmtSize(b) {
@@ -353,37 +466,24 @@ function fmtSize(b) {
 }
 function hashStr(s) {
   let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
 }
 function loadJSON(key, fallback) {
-  try {
-    const v = JSON.parse(localStorage.getItem(key));
-    return (v == null) ? fallback : v;
-  } catch (e) { return fallback; }
+  try { const v = JSON.parse(localStorage.getItem(key)); return (v == null) ? fallback : v; }
+  catch (e) { return fallback; }
 }
 
 /* ============================================================
    INDEXEDDB
-   ------------------------------------------------------------
-   All helpers keep an explicit reference to the transaction so
-   it cannot be garbage-collected mid-flight (a known cause of
-   silent import failures in Safari).
    ============================================================ */
 const DB_NAME = 'resonance-db';
 const DB_VERSION = 1;
 let db = null;
-let dbReady = null;
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    if (!('indexedDB' in window)) {
-      reject(new Error('IndexedDB is not available in this browser.'));
-      return;
-    }
+    if (!('indexedDB' in window)) { reject(new Error('IndexedDB unavailable')); return; }
     let settled = false;
     const req = window.indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
@@ -393,121 +493,84 @@ function openDB() {
       if (!d.objectStoreNames.contains('art'))   d.createObjectStore('art',   { keyPath: 'id' });
     };
     req.onsuccess = () => { if (!settled) { settled = true; resolve(req.result); } };
-    req.onerror   = () => { if (!settled) { settled = true; reject(req.error || new Error('IndexedDB open failed.')); } };
-    req.onblocked = () => { /* another tab holds an old version */ };
+    req.onerror   = () => { if (!settled) { settled = true; reject(req.error || new Error('open failed')); } };
   });
 }
-
 function idbPut(name, val) {
   return new Promise((resolve, reject) => {
-    if (!db) { reject(new Error('Database unavailable.')); return; }
-    let tx;
-    try { tx = db.transaction(name, 'readwrite'); }
-    catch (e) { reject(e); return; }
-    const st = tx.objectStore(name);
-    let req;
-    try { req = st.put(val); }
-    catch (e) { reject(e); return; }
+    if (!db) { reject(new Error('No DB')); return; }
+    let tx; try { tx = db.transaction(name, 'readwrite'); } catch (e) { reject(e); return; }
+    const req = tx.objectStore(name).put(val);
     req.onsuccess = () => resolve(req.result);
-    req.onerror   = () => reject(req.error || new Error('Write failed.'));
-    tx.onabort    = () => reject(tx.error || new Error('Transaction aborted.'));
-    tx.onerror    = () => reject(tx.error || new Error('Transaction error.'));
+    req.onerror   = () => reject(req.error || new Error('write failed'));
+    tx.onabort    = () => reject(tx.error || new Error('tx aborted'));
   });
 }
-
 function idbGet(name, key) {
   return new Promise((resolve, reject) => {
     if (!db) { resolve(null); return; }
-    let tx;
-    try { tx = db.transaction(name, 'readonly'); }
-    catch (e) { reject(e); return; }
-    const st = tx.objectStore(name);
-    const req = st.get(key);
+    let tx; try { tx = db.transaction(name, 'readonly'); } catch (e) { reject(e); return; }
+    const req = tx.objectStore(name).get(key);
     req.onsuccess = () => resolve(req.result || null);
-    req.onerror   = () => reject(req.error || new Error('Read failed.'));
+    req.onerror   = () => reject(req.error || new Error('read failed'));
   });
 }
-
 function idbDel(name, key) {
   return new Promise((resolve, reject) => {
     if (!db) { resolve(); return; }
-    let tx;
-    try { tx = db.transaction(name, 'readwrite'); }
-    catch (e) { reject(e); return; }
-    const st = tx.objectStore(name);
-    const req = st.delete(key);
+    let tx; try { tx = db.transaction(name, 'readwrite'); } catch (e) { reject(e); return; }
+    const req = tx.objectStore(name).delete(key);
     req.onsuccess = () => resolve();
-    req.onerror   = () => reject(req.error || new Error('Delete failed.'));
-    tx.onabort    = () => reject(tx.error || new Error('Transaction aborted.'));
+    req.onerror   = () => reject(req.error || new Error('delete failed'));
+    tx.onabort    = () => reject(tx.error || new Error('tx aborted'));
   });
 }
-
 function idbAll(name) {
   return new Promise((resolve, reject) => {
     if (!db) { resolve([]); return; }
-    let tx;
-    try { tx = db.transaction(name, 'readonly'); }
-    catch (e) { reject(e); return; }
-    const st = tx.objectStore(name);
-    const req = st.getAll();
+    let tx; try { tx = db.transaction(name, 'readonly'); } catch (e) { reject(e); return; }
+    const req = tx.objectStore(name).getAll();
     req.onsuccess = () => resolve(req.result || []);
-    req.onerror   = () => reject(req.error || new Error('Read failed.'));
+    req.onerror   = () => reject(req.error || new Error('read failed'));
   });
 }
-
 function idbClear(name) {
   return new Promise((resolve, reject) => {
     if (!db) { resolve(); return; }
-    let tx;
-    try { tx = db.transaction(name, 'readwrite'); }
-    catch (e) { reject(e); return; }
-    const st = tx.objectStore(name);
-    const req = st.clear();
+    let tx; try { tx = db.transaction(name, 'readwrite'); } catch (e) { reject(e); return; }
+    const req = tx.objectStore(name).clear();
     req.onsuccess = () => resolve();
-    req.onerror   = () => reject(req.error || new Error('Clear failed.'));
+    req.onerror   = () => reject(req.error || new Error('clear failed'));
+    tx.onabort    = () => reject(tx.error || new Error('tx aborted'));
   });
 }
 
 /* ============================================================
    ID3v2 TAG READER
    ============================================================ */
-function syncsafe(b, o) {
-  return ((b[o] & 0x7f) << 21) |
-         ((b[o + 1] & 0x7f) << 14) |
-         ((b[o + 2] & 0x7f) << 7) |
-          (b[o + 3] & 0x7f);
-}
-function readU32(b, o) {
-  return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
-}
-function str3(b, o) { return String.fromCharCode(b[o], b[o + 1], b[o + 2]); }
-function str4(b, o) { return String.fromCharCode(b[o], b[o + 1], b[o + 2], b[o + 3]); }
+function syncsafe(b, o) { return ((b[o] & 0x7f) << 21) | ((b[o+1] & 0x7f) << 14) | ((b[o+2] & 0x7f) << 7) | (b[o+3] & 0x7f); }
+function readU32(b, o) { return ((b[o] << 24) | (b[o+1] << 16) | (b[o+2] << 8) | b[o+3]) >>> 0; }
+function str3(b, o) { return String.fromCharCode(b[o], b[o+1], b[o+2]); }
+function str4(b, o) { return String.fromCharCode(b[o], b[o+1], b[o+2], b[o+3]); }
 
 function decodeText(bytes) {
   if (!bytes || bytes.length < 1) return '';
-  const enc = bytes[0];
-  const body = bytes.subarray(1);
+  const enc = bytes[0], body = bytes.subarray(1);
   let out = '';
   try {
-    if (enc === 0)      out = new TextDecoder('windows-1252').decode(body);
+    if (enc === 0) out = new TextDecoder('windows-1252').decode(body);
     else if (enc === 1) out = new TextDecoder('utf-16').decode(body);
     else if (enc === 2) out = new TextDecoder('utf-16be').decode(body);
-    else                out = new TextDecoder('utf-8').decode(body);
-  } catch (e) {
-    try { out = new TextDecoder('utf-8').decode(body); } catch (e2) { out = ''; }
-  }
+    else out = new TextDecoder('utf-8').decode(body);
+  } catch (e) { try { out = new TextDecoder('utf-8').decode(body); } catch (e2) { out = ''; } }
   return out.replace(/\u0000+$/g, '').trim();
 }
-
 function parseAPIC(d, v2) {
   if (d.length < 6) return null;
-  let p = 0;
-  const enc = d[p++];
+  let p = 0; const enc = d[p++];
   let mime;
-  if (v2) {
-    mime = 'image/' + String.fromCharCode(d[1], d[2], d[3]).toLowerCase();
-    p = 4;
-  } else {
+  if (v2) { mime = 'image/' + String.fromCharCode(d[1], d[2], d[3]).toLowerCase(); p = 4; }
+  else {
     const s = p;
     while (p < d.length && d[p] !== 0) p++;
     if (p >= d.length) return null;
@@ -515,47 +578,37 @@ function parseAPIC(d, v2) {
     p++;
   }
   if (p >= d.length) return null;
-  p++; // picture type
-  if (enc === 1 || enc === 2) {
-    while (p + 1 < d.length && !(d[p] === 0 && d[p + 1] === 0)) p += 2;
-    p += 2;
-  } else {
-    while (p < d.length && d[p] !== 0) p++;
-    p++;
-  }
+  p++;
+  if (enc === 1 || enc === 2) { while (p + 1 < d.length && !(d[p] === 0 && d[p + 1] === 0)) p += 2; p += 2; }
+  else { while (p < d.length && d[p] !== 0) p++; p++; }
   if (p >= d.length) return null;
   const img = d.subarray(p);
   if (img.length < 256) return null;
   const type = (mime && mime.indexOf('/') > 0) ? mime : 'image/jpeg';
-  try { return new Blob([img], { type: type }); }
-  catch (e) { return null; }
+  try { return new Blob([img], { type: type }); } catch (e) { return null; }
 }
-
 function parseID3(buffer) {
   try {
     const b = new Uint8Array(buffer);
     if (b.length < 10) return null;
-    if (b[0] !== 0x49 || b[1] !== 0x44 || b[2] !== 0x33) return null; // "ID3"
+    if (b[0] !== 0x49 || b[1] !== 0x44 || b[2] !== 0x33) return null;
     const ver = b[3];
     if (ver < 2 || ver > 4) return null;
     const flags = b[5];
     const size = syncsafe(b, 6);
     let pos = 10;
-
     if (flags & 0x40) {
       if (ver === 3 && pos + 4 <= b.length) pos += 4 + readU32(b, pos);
       else if (ver === 4 && pos + 4 <= b.length) pos += syncsafe(b, pos);
     }
-
     const end = Math.min(b.length, 10 + size);
     const tags = { title: '', artist: '', album: '', art: null };
-
     while (pos + 6 < end) {
       let id, fsize, hlen;
       if (ver === 2) {
         if (pos + 6 > end) break;
         id = str3(b, pos);
-        fsize = (b[pos + 3] << 16) | (b[pos + 4] << 8) | b[pos + 5];
+        fsize = (b[pos+3] << 16) | (b[pos+4] << 8) | b[pos+5];
         hlen = 6;
       } else {
         if (pos + 10 > end) break;
@@ -564,48 +617,35 @@ function parseID3(buffer) {
         hlen = 10;
       }
       if (!/^[A-Z0-9]{3,4}$/.test(id)) break;
-
       const start = pos + hlen;
       if (fsize <= 0 || start + fsize > end) break;
       const data = b.subarray(start, start + fsize);
-
-      if (id === 'TIT2' || id === 'TT2')      tags.title  = decodeText(data);
+      if (id === 'TIT2' || id === 'TT2') tags.title = decodeText(data);
       else if (id === 'TPE1' || id === 'TP1') tags.artist = decodeText(data);
-      else if (id === 'TALB' || id === 'TAL') tags.album  = decodeText(data);
+      else if (id === 'TALB' || id === 'TAL') tags.album = decodeText(data);
       else if ((id === 'APIC' || id === 'PIC') && !tags.art) {
-        try { tags.art = parseAPIC(data, ver === 2); } catch (e) { /* ignore */ }
+        try { tags.art = parseAPIC(data, ver === 2); } catch (e) {}
       }
       pos = start + fsize;
     }
     return tags;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 /* ============================================================
-   FILENAME FALLBACK
+   FILENAME / DURATION
    ============================================================ */
 function parseName(name) {
   const base = String(name || '').replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
   const parts = base.split(/\s+-\s+/);
-  if (parts.length >= 2) {
-    return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
-  }
+  if (parts.length >= 2) return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
   return { artist: '', title: base || 'Untitled' };
 }
-
-/* ============================================================
-   DURATION PROBE
-   ============================================================ */
 function probeDuration(file) {
   return new Promise(resolve => {
-    let settled = false;
-    let url = null;
+    let settled = false, url = null;
     const done = (d) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
+      if (settled) return; settled = true; clearTimeout(timer);
       try { a.removeAttribute('src'); a.load(); } catch (e) {}
       if (url) { try { URL.revokeObjectURL(url); } catch (e) {} }
       resolve(isFinite(d) && d > 0 ? d : 0);
@@ -615,106 +655,346 @@ function probeDuration(file) {
     try {
       url = URL.createObjectURL(file);
       a = document.createElement('audio');
-      a.preload = 'metadata';
-      a.muted = true;
+      a.preload = 'metadata'; a.muted = true;
       a.onloadedmetadata = () => done(a.duration);
       a.onerror = () => done(0);
       a.src = url;
-    } catch (e) {
-      done(0);
-    }
+    } catch (e) { done(0); }
   });
 }
 
 /* ============================================================
    SETTINGS
    ============================================================ */
-const LS_KEY = 'resonance.settings.v1';
+const LS_KEY = 'resonance.settings.v2';
 const DEFAULTS = {
-  volume: 0.9,
-  shuffle: false,
-  repeat: 'off',
-  autoplay: true,
-  speed: 1,
-  scene: true,
-  cardHover: true,
-  reduceMotion: false,
-  highContrast: false
+  volume: 0.9, shuffle: false, repeat: 'off', autoplay: true, speed: 1,
+  scene: true, cardHover: true, reduceMotion: false, highContrast: false,
+  // audio enhancement
+  enhance: true, preset: 'flat', bass: 0, mid: 0, treble: 0, compressor: false,
+  // artwork / theme
+  artVisible: true, autoTheme: true, pulse: true
 };
 const settings = Object.assign({}, DEFAULTS, loadJSON(LS_KEY, {}));
 
+const PRESETS = {
+  flat:   { bass: 0,  mid: 0,  treble: 0 },
+  bass:   { bass: 8,  mid: 1,  treble: 2 },
+  vocal:  { bass: -2, mid: 4,  treble: 3 },
+  warm:   { bass: 4,  mid: 2,  treble: -2 },
+  bright: { bass: -1, mid: 2,  treble: 7 }
+};
+
 const state = {
-  tracks: [],
-  view: [],
-  filter: 'all',
-  query: '',
-  currentId: null,
-  queue: [],
-  importing: false,
-  artUrls: new Map(),
-  artObserver: null
+  tracks: [], view: [], filter: 'all', query: '',
+  currentId: null, queue: [], importing: false,
+  artUrls: new Map(), artObserver: null,
+  currentArtBlob: null, currentArtURL: null,
+  currentColors: null
 };
 
 /* ============================================================
-   AUDIO ELEMENT
+   AUDIO ELEMENT + WEB AUDIO GRAPH
    ============================================================ */
 const audio = new Audio();
 audio.preload = 'metadata';
 audio.volume = settings.volume;
 audio.playbackRate = settings.speed;
 audio.setAttribute('playsinline', '');
-audio.crossOrigin = 'anonymous';
 document.body.appendChild(audio);
 
 let currentObjectURL = null;
 let lastSessionArtURL = null;
 let scrubbing = false;
 
+// Web Audio graph
+let audioCtx = null;
+let sourceNode = null;
+let bassNode = null, midNode = null, trebleNode = null;
+let compNode = null;
+let analyserNode = null;
+let audioGraphReady = false;
+
+function ensureAudioGraph() {
+  if (audioGraphReady) { resumeAudioCtx(); return true; }
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return false;
+  try {
+    audioCtx = new Ctx();
+    sourceNode = audioCtx.createMediaElementSource(audio);
+
+    bassNode = audioCtx.createBiquadFilter();
+    bassNode.type = 'lowshelf';
+    bassNode.frequency.value = 180;
+    bassNode.gain.value = 0;
+
+    midNode = audioCtx.createBiquadFilter();
+    midNode.type = 'peaking';
+    midNode.frequency.value = 1100;
+    midNode.Q.value = 0.85;
+    midNode.gain.value = 0;
+
+    trebleNode = audioCtx.createBiquadFilter();
+    trebleNode.type = 'highshelf';
+    trebleNode.frequency.value = 4200;
+    trebleNode.gain.value = 0;
+
+    compNode = audioCtx.createDynamicsCompressor();
+    compNode.threshold.value = -22;
+    compNode.knee.value = 12;
+    compNode.ratio.value = 1;
+    compNode.attack.value = 0.006;
+    compNode.release.value = 0.22;
+
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 512;
+    analyserNode.smoothingTimeConstant = 0.78;
+
+    sourceNode.connect(bassNode);
+    bassNode.connect(midNode);
+    midNode.connect(trebleNode);
+    trebleNode.connect(compNode);
+    compNode.connect(analyserNode);
+    analyserNode.connect(audioCtx.destination);
+
+    audioGraphReady = true;
+    applyAudioEnhance();
+    return true;
+  } catch (e) {
+    console.warn('[Resonance] Audio graph unavailable:', e);
+    audioGraphReady = false;
+    return false;
+  }
+}
+function resumeAudioCtx() {
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+}
+
+function applyAudioEnhance() {
+  if (!audioGraphReady) return;
+  const on = !!settings.enhance;
+  bassNode.gain.value   = on ? settings.bass   : 0;
+  midNode.gain.value    = on ? settings.mid    : 0;
+  trebleNode.gain.value = on ? settings.treble : 0;
+  compNode.ratio.value  = (on && settings.compressor) ? 3.5 : 1;
+  compNode.threshold.value = (on && settings.compressor) ? -22 : 0;
+}
+
+/* ============================================================
+   COLOUR EXTRACTION FROM ARTWORK
+   ============================================================ */
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  let h = 0, s = 0;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+
+function extractColorsFromBlob(blob) {
+  return new Promise(resolve => {
+    let url = null;
+    try { url = URL.createObjectURL(blob); } catch (e) { resolve(null); return; }
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => {
+      try {
+        const size = 72;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, size, size);
+        const data = ctx.getImageData(0, 0, size, size).data;
+
+        const buckets = new Map();
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+          if (a < 140) continue;
+          const key = (r >> 4) << 8 | (g >> 4) << 4 | (b >> 4);
+          const ex = buckets.get(key);
+          if (ex) { ex.count++; ex.r += r; ex.g += g; ex.b += b; }
+          else buckets.set(key, { count: 1, r: r, g: g, b: b });
+        }
+
+        const arr = [];
+        buckets.forEach(v => {
+          arr.push({
+            count: v.count,
+            r: Math.round(v.r / v.count),
+            g: Math.round(v.g / v.count),
+            b: Math.round(v.b / v.count)
+          });
+        });
+        arr.sort((a, b) => b.count - a.count);
+
+        const picked = [];
+        for (const c of arr) {
+          const hsl = rgbToHsl(c.r, c.g, c.b);
+          if (hsl.s < 12) continue;
+          if (hsl.l < 8 || hsl.l > 92) continue;
+          let tooClose = false;
+          for (const p of picked) {
+            const d = Math.abs(p.r - c.r) + Math.abs(p.g - c.g) + Math.abs(p.b - c.b);
+            if (d < 55) { tooClose = true; break; }
+          }
+          if (tooClose) continue;
+          picked.push({ r: c.r, g: c.g, b: c.b, h: hsl.h, s: hsl.s, l: hsl.l });
+          if (picked.length >= 3) break;
+        }
+
+        try { URL.revokeObjectURL(url); } catch (e) {}
+        resolve(picked.length ? picked : null);
+      } catch (e) {
+        try { URL.revokeObjectURL(url); } catch (e2) {}
+        resolve(null);
+      }
+    };
+    img.onerror = () => { try { URL.revokeObjectURL(url); } catch (e) {} resolve(null); };
+    img.src = url;
+  });
+}
+
+function colorsFromTrackFallback(t) {
+  const h = hashStr(t.id) % 360;
+  const h2 = (h + 45 + (hashStr(t.title || '') % 80)) % 360;
+  return [
+    { r: hslToRgb(h, 55, 55).r, g: hslToRgb(h, 55, 55).g, b: hslToRgb(h, 55, 55).b },
+    { r: hslToRgb(h2, 60, 40).r, g: hslToRgb(h2, 60, 40).g, b: hslToRgb(h2, 60, 40).b }
+  ];
+}
+function hslToRgb(h, s, l) {
+  s /= 100; l /= 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r = c; g = x; }
+  else if (h < 120) { r = x; g = c; }
+  else if (h < 180) { g = c; b = x; }
+  else if (h < 240) { g = x; b = c; }
+  else if (h < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) };
+}
+
+function rgbStr(c, a) {
+  return a === undefined
+    ? `rgb(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)})`
+    : `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${a})`;
+}
+function mixCol(a, b, t) {
+  return { r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t };
+}
+function adjustLum(c, target) {
+  const lum = (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255;
+  if (lum < 0.001) return { r: target * 255, g: target * 255, b: target * 255 };
+  const s = target / lum;
+  return { r: clamp(c.r * s, 0, 255), g: clamp(c.g * s, 0, 255), b: clamp(c.b * s, 0, 255) };
+}
+
+function applyTheme(colors) {
+  const root = document.documentElement;
+  if (!colors || !colors.length || !settings.autoTheme) {
+    root.style.removeProperty('--accent');
+    root.style.removeProperty('--accent-2');
+    root.style.removeProperty('--accent-glow');
+    root.style.removeProperty('--theme-tint');
+    root.style.removeProperty('--theme-tint-2');
+    root.style.removeProperty('--theme-deep');
+    root.style.removeProperty('--theme-shadow');
+    return;
+  }
+  const primary = colors[0];
+  const secondary = colors[1] || mixCol(primary, { r: 255, g: 255, b: 255 }, 0.35);
+
+  const a1 = adjustLum(primary, 0.62);
+  const a2 = adjustLum(secondary, 0.78);
+  const deep = mixCol(primary, { r: 8, g: 4, b: 6 }, 0.82);
+
+  root.style.setProperty('--accent', rgbStr(a1));
+  root.style.setProperty('--accent-2', rgbStr(a2));
+  root.style.setProperty('--accent-glow', rgbStr(a1, 0.55));
+  root.style.setProperty('--theme-tint', rgbStr(primary, 0.22));
+  root.style.setProperty('--theme-tint-2', rgbStr(secondary, 0.16));
+  root.style.setProperty('--theme-deep', rgbStr(deep));
+  root.style.setProperty('--theme-shadow', rgbStr(primary, 0.35));
+  document.body.classList.add('themed');
+}
+
+function clearTheme() {
+  applyTheme(null);
+  document.body.classList.remove('themed');
+}
+
+/* ============================================================
+   AUDIO-REACTIVE PULSE LOOP
+   ============================================================ */
+let pulseRAF = null;
+const freqData = new Uint8Array(256);
+
+function startPulseLoop() {
+  if (pulseRAF) return;
+  const loop = () => {
+    pulseRAF = requestAnimationFrame(loop);
+    const stage = document.getElementById('artStage');
+    if (!stage) return;
+    if (!settings.pulse || !analyserNode || audio.paused || audio.ended) {
+      stage.style.setProperty('--pulse', '0');
+      return;
+    }
+    analyserNode.getByteFrequencyData(freqData);
+    // Bass region (bins ~1-12 covers roughly 40-200 Hz at 48kHz/fft512)
+    let bass = 0;
+    for (let i = 1; i < 14; i++) bass += freqData[i];
+    bass /= 13;
+    // Overall energy in the low-mid range
+    let total = 0;
+    for (let i = 0; i < 40; i++) total += freqData[i];
+    total /= 40;
+
+    const v = clamp((bass * 0.65 + total * 0.35) / 175, 0, 1.35);
+    stage.style.setProperty('--pulse', v.toFixed(3));
+  };
+  loop();
+}
+
 /* ============================================================
    DOM REFS
    ============================================================ */
 const dom = {
-  status: $('#status'),
-  statusText: $('#statusText'),
-  nowTitle: $('#nowTitle'),
-  nowMeta: $('#nowMeta'),
-  dockPlayIcon: $('#dockPlayIcon'),
-  dockPlay: $('#dockPlay'),
-  dockPrev: $('#dockPrev'),
-  dockNext: $('#dockNext'),
-  seek: $('#seek'),
-  timeNow: $('#timeNow'),
-  timeTotal: $('#timeTotal'),
+  status: $('#status'), statusText: $('#statusText'),
+  nowTitle: $('#nowTitle'), nowMeta: $('#nowMeta'),
+  dockPlayIcon: $('#dockPlayIcon'), dockPlay: $('#dockPlay'),
+  dockPrev: $('#dockPrev'), dockNext: $('#dockNext'),
+  seek: $('#seek'), timeNow: $('#timeNow'), timeTotal: $('#timeTotal'),
   volume: $('#volume'),
-  readTitle: $('#readTitle'),
-  readSub: $('#readSub'),
-  vault: $('#vault'),
-  grid: $('#grid'),
-  empty: $('#empty'),
-  vaultCount: $('#vaultCount'),
-  search: $('#search'),
-  filters: $('#filters'),
-  storageFill: $('#storageFill'),
-  storageText: $('#storageText'),
+  readTitle: $('#readTitle'), readSub: $('#readSub'),
+  vault: $('#vault'), grid: $('#grid'), empty: $('#empty'), vaultCount: $('#vaultCount'),
+  search: $('#search'), filters: $('#filters'),
+  storageFill: $('#storageFill'), storageText: $('#storageText'),
   fileInput: $('#fileInput'),
-  toast: $('#toast'),
-  toastText: $('#toastText'),
-  toastFill: $('#toastFill'),
-  toastBar: $('#toastBar'),
-  dropzone: $('#dropzone'),
-  settings: $('#settings'),
-  railShuffle: $('#railShuffle'),
-  railRepeat: $('#railRepeat'),
-  savedBadge: $('#savedBadge'),
-  persistDesc: $('#persistDesc')
+  toast: $('#toast'), toastText: $('#toastText'),
+  toastFill: $('#toastFill'), toastBar: $('#toastBar'),
+  dropzone: $('#dropzone'), settings: $('#settings'),
+  railShuffle: $('#railShuffle'), railRepeat: $('#railRepeat'),
+  railArt: $('#railArt'), railTheme: $('#railTheme'),
+  savedBadge: $('#savedBadge'), persistDesc: $('#persistDesc'),
+  artStage: $('#artStage'), artFrame: $('#artFrame'),
+  artImage: $('#artImage'), artFallback: $('#artFallback'),
+  themeWash: $('#themeWash')
 };
 
 /* ============================================================
-   SETTINGS — APPLY / SAVE
+   SETTINGS — SAVE / APPLY
    ============================================================ */
-function saveSettings() {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(settings)); } catch (e) {}
-}
+function saveSettings() { try { localStorage.setItem(LS_KEY, JSON.stringify(settings)); } catch (e) {} }
 function flashSaved() {
   dom.savedBadge.classList.add('flash');
   dom.savedBadge.textContent = 'Saved';
@@ -724,25 +1004,24 @@ function flashSaved() {
     dom.savedBadge.textContent = 'Settings stored locally';
   }, 1400);
 }
-function paintSwitch(el, on) {
-  if (!el) return;
-  el.classList.toggle('on', !!on);
-  el.setAttribute('aria-checked', String(!!on));
-}
-function paintRange(el, pct) {
-  if (!el) return;
-  el.style.setProperty('--pct', clamp(pct, 0, 100) + '%');
-}
+function paintSwitch(el, on) { if (!el) return; el.classList.toggle('on', !!on); el.setAttribute('aria-checked', String(!!on)); }
+function paintRange(el, pct) { if (!el) return; el.style.setProperty('--pct', clamp(pct, 0, 100) + '%'); }
+
 function applySettings() {
   document.body.classList.toggle('no-scene', !settings.scene);
   document.body.classList.toggle('card-hover', !!settings.cardHover);
   document.body.classList.toggle('reduce-motion', !!settings.reduceMotion);
   document.body.classList.toggle('high-contrast', !!settings.highContrast);
+  document.body.classList.toggle('art-visible', !!settings.artVisible);
+  document.body.classList.toggle('pulse-on', !!settings.pulse);
   audio.volume = settings.volume;
   audio.playbackRate = settings.speed;
   paintRange(dom.volume, settings.volume * 100);
   syncShuffleUI();
   syncRepeatUI();
+  syncEnhanceUI();
+  applyAudioEnhance();
+  if (!settings.autoTheme) clearTheme();
 }
 function syncShuffleUI() {
   paintSwitch($('#setShuffle'), settings.shuffle);
@@ -751,7 +1030,25 @@ function syncShuffleUI() {
 function syncRepeatUI() {
   $$('#setRepeat button').forEach(b => b.classList.toggle('active', b.dataset.repeat === settings.repeat));
   dom.railRepeat.classList.toggle('on', settings.repeat !== 'off');
-  dom.railRepeat.title = 'Repeat: ' + settings.repeat;
+}
+function syncEnhanceUI() {
+  paintSwitch($('#setEnhance'), settings.enhance);
+  paintSwitch($('#setCompressor'), settings.compressor);
+  paintSwitch($('#setArtVisible'), settings.artVisible);
+  paintSwitch($('#setAutoTheme'), settings.autoTheme);
+  paintSwitch($('#setPulse'), settings.pulse);
+  $$('#setPreset button').forEach(b => b.classList.toggle('active', b.dataset.preset === settings.preset));
+
+  const setSlider = (id, valId, value) => {
+    const s = $('#' + id), v = $('#' + valId);
+    if (!s || !v) return;
+    s.value = String(value);
+    v.textContent = (value >= 0 ? '+' : '') + value.toFixed(1) + ' dB';
+    paintRange(s, ((value + 10) / 20) * 100);
+  };
+  setSlider('setBass', 'setBassVal', settings.bass);
+  setSlider('setMid', 'setMidVal', settings.mid);
+  setSlider('setTreble', 'setTrebleVal', settings.treble);
 }
 function bindSwitch(el, key, after) {
   if (!el) return;
@@ -806,7 +1103,45 @@ function updateMediaSession(meta, art) {
       album: meta.album || 'Resonance',
       artwork: artwork
     });
-  } catch (e) { /* ignore */ }
+  } catch (e) {}
+}
+
+/* ============================================================
+   ARTWORK DISPLAY
+   ============================================================ */
+function setArtwork(blobOrNull, track) {
+  // Release prior URL
+  if (state.currentArtURL) { try { URL.revokeObjectURL(state.currentArtURL); } catch (e) {} state.currentArtURL = null; }
+  state.currentArtBlob = blobOrNull;
+
+  if (blobOrNull) {
+    state.currentArtURL = URL.createObjectURL(blobOrNull);
+    dom.artImage.src = state.currentArtURL;
+    dom.artImage.style.display = '';
+    dom.artFallback.style.display = 'none';
+    dom.artFallback.style.background = '';
+  } else {
+    dom.artImage.removeAttribute('src');
+    dom.artImage.style.display = 'none';
+    // Generate a deterministic gradient fallback
+    const h1 = hashStr(track ? track.id : 'default') % 360;
+    const h2 = (h1 + 55) % 360;
+    dom.artFallback.style.display = '';
+    dom.artFallback.style.background =
+      `radial-gradient(circle at 30% 25%, hsla(${h1}, 60%, 55%, .45), transparent 62%),` +
+      `linear-gradient(150deg, hsl(${h1}, 45%, 28%), hsl(${h2}, 50%, 14%))`;
+  }
+}
+
+async function updateThemeForTrack(track, artBlob) {
+  if (!settings.autoTheme) { clearTheme(); return; }
+  let colors = null;
+  if (artBlob) {
+    colors = await extractColorsFromBlob(artBlob);
+  }
+  if (!colors) colors = colorsFromTrackFallback(track);
+  state.currentColors = colors;
+  applyTheme(colors);
 }
 
 /* ============================================================
@@ -818,18 +1153,14 @@ async function playTrack(id, autoplay) {
   if (!meta) return;
 
   let rec = null;
-  try { rec = await idbGet('blobs', id); }
-  catch (e) { rec = null; }
+  try { rec = await idbGet('blobs', id); } catch (e) { rec = null; }
+  if (!rec || !rec.blob) { toast('Track data is missing from storage.'); return; }
 
-  if (!rec || !rec.blob) {
-    toast('Track data is missing from storage.');
-    return;
-  }
+  let artRec = null;
+  try { artRec = await idbGet('art', id); } catch (e) { artRec = null; }
+  const artBlob = artRec && artRec.blob ? artRec.blob : null;
 
-  if (currentObjectURL) {
-    try { URL.revokeObjectURL(currentObjectURL); } catch (e) {}
-    currentObjectURL = null;
-  }
+  if (currentObjectURL) { try { URL.revokeObjectURL(currentObjectURL); } catch (e) {} currentObjectURL = null; }
   currentObjectURL = URL.createObjectURL(rec.blob);
 
   audio.src = currentObjectURL;
@@ -837,7 +1168,9 @@ async function playTrack(id, autoplay) {
   state.currentId = id;
 
   updateNowPlaying(meta);
-  updateMediaSession(meta, rec.art || null);
+  updateMediaSession(meta, artBlob);
+  setArtwork(artBlob, meta);
+  updateThemeForTrack(meta, artBlob);
   markActiveCard();
 
   if (autoplay) {
@@ -845,6 +1178,7 @@ async function playTrack(id, autoplay) {
       await audio.play();
       setStatus('playing');
       setPlayIcon(true);
+      startPulseLoop();
     } catch (e) {
       setStatus('paused');
       setPlayIcon(false);
@@ -857,25 +1191,21 @@ function buildQueue(preferredId) {
   state.queue = list.slice();
   if (preferredId && state.queue.indexOf(preferredId) === -1) state.queue.unshift(preferredId);
 }
-
 function stepIndex(dir) {
   const q = state.queue.length ? state.queue : state.tracks.map(t => t.id);
   if (!q.length) return -1;
   let i = q.indexOf(state.currentId);
   if (i === -1) i = 0;
-
   if (settings.shuffle && dir > 0) {
     if (q.length === 1) return 0;
-    let r;
-    do { r = Math.floor(Math.random() * q.length); } while (r === i);
+    let r; do { r = Math.floor(Math.random() * q.length); } while (r === i);
     return r;
   }
   let n = i + dir;
   if (n >= q.length) return settings.repeat === 'all' ? 0 : -1;
-  if (n < 0)         return settings.repeat === 'all' ? q.length - 1 : -1;
+  if (n < 0) return settings.repeat === 'all' ? q.length - 1 : -1;
   return n;
 }
-
 function playNext(dir) {
   const q = state.queue.length ? state.queue : state.tracks.map(t => t.id);
   state.queue = q;
@@ -883,31 +1213,16 @@ function playNext(dir) {
   if (idx < 0) { stopPlayback(); return; }
   playTrack(q[idx], true);
 }
+function stopPlayback() { audio.pause(); setStatus('idle'); setPlayIcon(false); }
 
-function stopPlayback() {
-  audio.pause();
-  setStatus('idle');
-  setPlayIcon(false);
-}
-
-audio.addEventListener('play', () => { setStatus('playing'); setPlayIcon(true); });
-audio.addEventListener('pause', () => {
-  if (audio.ended) return;
-  setStatus('paused');
-  setPlayIcon(false);
-});
+audio.addEventListener('play', () => { resumeAudioCtx(); setStatus('playing'); setPlayIcon(true); startPulseLoop(); });
+audio.addEventListener('pause', () => { if (audio.ended) return; setStatus('paused'); setPlayIcon(false); });
 audio.addEventListener('ended', () => {
-  if (settings.repeat === 'one') {
-    try { audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {}
-    return;
-  }
+  if (settings.repeat === 'one') { try { audio.currentTime = 0; audio.play().catch(() => {}); } catch (e) {} return; }
   if (settings.autoplay) playNext(1);
   else stopPlayback();
 });
-audio.addEventListener('error', () => {
-  setStatus('paused', 'Error');
-  setPlayIcon(false);
-});
+audio.addEventListener('error', () => { setStatus('paused', 'Error'); setPlayIcon(false); });
 audio.addEventListener('timeupdate', updateTimeUI);
 audio.addEventListener('loadedmetadata', updateTimeUI);
 audio.addEventListener('durationchange', updateTimeUI);
@@ -953,21 +1268,13 @@ function filterTracks() {
 }
 
 let renderToken = 0;
-
-function refresh() {
-  state.view = filterTracks();
-  renderGrid();
-  updateVaultMeta();
-  updateStorage();
-}
+function refresh() { state.view = filterTracks(); renderGrid(); updateVaultMeta(); updateStorage(); }
 
 function renderGrid() {
   const token = ++renderToken;
-
-  // Clean up previous artwork URLs
   state.artUrls.forEach(url => { if (url) { try { URL.revokeObjectURL(url); } catch (e) {} } });
   state.artUrls.clear();
-  if (state.artObserver) { state.artObserver.disconnect(); }
+  if (state.artObserver) state.artObserver.disconnect();
   state.artObserver = ('IntersectionObserver' in window)
     ? new IntersectionObserver(onArtIntersect, { rootMargin: '400px 0px' })
     : null;
@@ -988,7 +1295,6 @@ function renderGrid() {
     if (i < list.length) requestAnimationFrame(step);
   })();
 }
-
 function onArtIntersect(entries) {
   entries.forEach(entry => {
     if (!entry.isIntersecting) return;
@@ -1002,9 +1308,7 @@ function onArtIntersect(entries) {
       const url = URL.createObjectURL(rec.blob);
       state.artUrls.set(id, url);
       const img = document.createElement('img');
-      img.decoding = 'async';
-      img.alt = '';
-      img.src = url;
+      img.decoding = 'async'; img.alt = ''; img.src = url;
       holder.innerHTML = '';
       holder.classList.remove('generated');
       holder.appendChild(img);
@@ -1027,8 +1331,7 @@ function makeCard(t) {
     preview.innerHTML = '<div class="bars"><i style="height:38%"></i><i style="height:62%"></i><i style="height:46%"></i><i style="height:74%"></i><i style="height:52%"></i></div>';
     state.artObserver.observe(card);
   } else {
-    const hue = 330 + (hashStr(t.id) % 40);
-    preview.style.setProperty('--h', hue);
+    preview.style.setProperty('--h', 330 + (hashStr(t.id) % 40));
     const bars = document.createElement('div');
     bars.className = 'bars';
     for (let k = 0; k < 5; k++) {
@@ -1041,55 +1344,35 @@ function makeCard(t) {
 
   const info = document.createElement('div');
   info.className = 'card-info';
-
-  const h3 = document.createElement('h3');
-  h3.textContent = t.title || t.name;
-
+  const h3 = document.createElement('h3'); h3.textContent = t.title || t.name;
   const small = document.createElement('small');
   small.textContent = (t.artist || 'Unknown artist') + (t.album ? ' · ' + t.album : '');
-
   const tag = document.createElement('span');
   tag.className = 'tag';
   tag.textContent = (t.duration ? fmtTime(t.duration) : '--:--') + ' · ' + fmtSize(t.size);
-
-  info.appendChild(h3);
-  info.appendChild(small);
-  info.appendChild(tag);
+  info.appendChild(h3); info.appendChild(small); info.appendChild(tag);
 
   const actions = document.createElement('div');
   actions.className = 'card-actions';
-
   const fav = document.createElement('button');
   fav.className = 'card-act fav' + (t.favorite ? ' on' : '');
   fav.setAttribute('aria-label', 'Toggle favourite');
   fav.innerHTML = '<svg class="ic"><use href="#i-heart"/></svg>';
-
   const del = document.createElement('button');
   del.className = 'card-act del';
   del.setAttribute('aria-label', 'Remove from library');
   del.innerHTML = '<svg class="ic"><use href="#i-trash"/></svg>';
+  actions.appendChild(fav); actions.appendChild(del);
 
-  actions.appendChild(fav);
-  actions.appendChild(del);
-
-  card.appendChild(preview);
-  card.appendChild(info);
-  card.appendChild(actions);
+  card.appendChild(preview); card.appendChild(info); card.appendChild(actions);
 
   card.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      playFromLibrary(t.id);
-    }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); playFromLibrary(t.id); }
   });
-
   return card;
 }
 
-function markActiveCard() {
-  $$('.card', dom.grid).forEach(c => c.classList.toggle('active', c.dataset.id === state.currentId));
-}
-
+function markActiveCard() { $$('.card', dom.grid).forEach(c => c.classList.toggle('active', c.dataset.id === state.currentId)); }
 function updateVaultMeta() {
   const total = state.tracks.reduce((a, t) => a + (t.size || 0), 0);
   const shown = state.view.length;
@@ -1099,15 +1382,9 @@ function updateVaultMeta() {
 }
 
 /* ============================================================
-   IMPORT — the important part
-   ------------------------------------------------------------
-   * Files are copied into an array BEFORE the input is cleared.
-   * `state.importing` is always reset via try/finally.
-   * Each file import is wrapped in its own try/catch so one bad
-   * file does not abort the whole batch.
+   IMPORT
    ============================================================ */
 const AUDIO_RE = /\.(mp3|m4a|m4b|aac|wav|wave|flac|ogg|oga|opus|aif|aiff|weba|mp4|m4p)$/i;
-
 function isAudioFile(f) {
   if (!f) return false;
   const type = (f.type || '').toLowerCase();
@@ -1116,111 +1393,70 @@ function isAudioFile(f) {
   return AUDIO_RE.test(f.name || '');
 }
 
-async function importOne(file, index, total) {
+async function importOne(file) {
   const id = uid();
-
-  // --- 1. ID3 tags (best effort) ---
   let tags = null;
   try {
-    const headSize = Math.min(file.size, 1024 * 1024); // 1 MB head
+    const headSize = Math.min(file.size, 1024 * 1024);
     if (headSize > 0) {
       const headBuf = await file.slice(0, headSize).arrayBuffer();
       tags = parseID3(headBuf);
     }
-  } catch (e) {
-    tags = null;
-  }
+  } catch (e) { tags = null; }
 
-  // --- 2. Duration (best effort) ---
   let duration = 0;
-  try { duration = await probeDuration(file); }
-  catch (e) { duration = 0; }
+  try { duration = await probeDuration(file); } catch (e) {}
 
-  // --- 3. Build record ---
   const fallback = parseName(file.name);
-  const title  = (tags && tags.title)  || fallback.title || file.name || 'Untitled';
+  const title  = (tags && tags.title)  || fallback.title  || file.name || 'Untitled';
   const artist = (tags && tags.artist) || fallback.artist || 'Unknown artist';
   const album  = (tags && tags.album)  || '';
 
   const rec = {
-    id: id,
-    name: file.name || (title + '.mp3'),
-    title: title,
-    artist: artist,
-    album: album,
-    size: file.size || 0,
-    type: file.type || 'audio/mpeg',
-    duration: duration,
-    added: Date.now(),
-    favorite: false,
-    hasArt: !!(tags && tags.art)
+    id: id, name: file.name || (title + '.mp3'),
+    title: title, artist: artist, album: album,
+    size: file.size || 0, type: file.type || 'audio/mpeg',
+    duration: duration, added: Date.now(),
+    favorite: false, hasArt: !!(tags && tags.art)
   };
 
-  // --- 4. Persist ---
   await idbPut('meta', rec);
 
-  // Store the audio as a Blob (convert File to plain Blob for best Safari compat)
   let storedBlob = file;
-  try {
-    if (file instanceof File) {
-      storedBlob = file.slice(0, file.size, file.type || 'audio/mpeg');
-    }
-  } catch (e) {
-    storedBlob = file;
-  }
+  try { if (file instanceof File) storedBlob = file.slice(0, file.size, file.type || 'audio/mpeg'); }
+  catch (e) { storedBlob = file; }
   await idbPut('blobs', { id: id, blob: storedBlob });
 
   if (tags && tags.art) {
     try { await idbPut('art', { id: id, blob: tags.art }); }
     catch (e) { rec.hasArt = false; }
   }
-
   state.tracks.push(rec);
   return rec;
 }
 
 async function importFiles(fileList) {
   if (state.importing) { toast('An import is already running.'); return; }
-
-  // CRITICAL: snapshot the FileList into a plain array immediately.
   const rawFiles = toArray(fileList);
   const files = rawFiles.filter(isAudioFile);
-
-  if (!rawFiles.length) {
-    toast('No files selected.');
-    return;
-  }
-  if (!files.length) {
-    toast('No supported audio files in selection.');
-    return;
-  }
+  if (!rawFiles.length) { toast('No files selected.'); return; }
+  if (!files.length) { toast('No supported audio files in selection.'); return; }
 
   state.importing = true;
   setStatus('importing');
   showToast('Preparing ' + files.length + ' file' + (files.length === 1 ? '' : 's') + '…', 0);
 
-  let done = 0;
-  let failed = 0;
+  let done = 0, failed = 0;
   const errors = [];
 
   try {
-    // Ask for persistent storage (fire-and-forget-ish, but await briefly).
-    if (navigator.storage && navigator.storage.persist) {
-      try { await navigator.storage.persist(); } catch (e) {}
-    }
+    if (navigator.storage && navigator.storage.persist) { try { await navigator.storage.persist(); } catch (e) {} }
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      try {
-        await importOne(file, i, files.length);
-        done++;
-      } catch (e) {
-        failed++;
-        errors.push({ name: file.name || ('file ' + (i + 1)), error: e });
-        console.error('[Resonance] Import failed for', file.name, e);
-      }
-      const pct = ((done + failed) / files.length) * 100;
-      showToast('Importing ' + (done + failed) + ' / ' + files.length, pct);
+      try { await importOne(file); done++; }
+      catch (e) { failed++; errors.push({ name: file.name || ('file ' + (i + 1)), error: e }); console.error('[Resonance] Import failed', file.name, e); }
+      showToast('Importing ' + (done + failed) + ' / ' + files.length, ((done + failed) / files.length) * 100);
       await nextFrame();
     }
 
@@ -1228,13 +1464,9 @@ async function importFiles(fileList) {
     refresh();
     setStatus(state.currentId ? 'paused' : 'idle');
 
-    if (failed && done) {
-      toast(done + ' imported · ' + failed + ' skipped');
-    } else if (failed && !done) {
-      toast('Import failed. See console for details.');
-    } else {
-      toast(done + ' track' + (done === 1 ? '' : 's') + ' added to the vault');
-    }
+    if (failed && done) toast(done + ' imported · ' + failed + ' skipped');
+    else if (failed && !done) toast('Import failed. See console for details.');
+    else toast(done + ' track' + (done === 1 ? '' : 's') + ' added to the vault');
   } catch (e) {
     console.error('[Resonance] Import error:', e);
     toast('Import failed: ' + (e && e.message ? e.message : 'unknown error'));
@@ -1265,11 +1497,11 @@ async function removeTrack(id) {
   if (state.currentId === id) {
     audio.pause();
     try { audio.removeAttribute('src'); audio.load(); } catch (e) {}
-    if (currentObjectURL) {
-      try { URL.revokeObjectURL(currentObjectURL); } catch (e) {}
-      currentObjectURL = null;
-    }
+    if (currentObjectURL) { try { URL.revokeObjectURL(currentObjectURL); } catch (e) {} currentObjectURL = null; }
+    if (state.currentArtURL) { try { URL.revokeObjectURL(state.currentArtURL); } catch (e) {} state.currentArtURL = null; }
     state.currentId = null;
+    setArtwork(null, null);
+    clearTheme();
     updateNowPlaying(null);
     setPlayIcon(false);
     setStatus('idle');
@@ -1280,7 +1512,6 @@ async function removeTrack(id) {
 
   refresh();
 }
-
 async function toggleFavourite(id) {
   const t = state.tracks.find(x => x.id === id);
   if (!t) return;
@@ -1297,8 +1528,7 @@ async function updateStorage() {
   try {
     if (navigator.storage && navigator.storage.estimate) {
       const est = await navigator.storage.estimate();
-      usage = est.usage || 0;
-      quota = est.quota || 0;
+      usage = est.usage || 0; quota = est.quota || 0;
     }
   } catch (e) {}
   const total = state.tracks.reduce((a, t) => a + (t.size || 0), 0);
@@ -1308,7 +1538,6 @@ async function updateStorage() {
     ? fmtSize(total) + ' library · ' + fmtSize(usage) + ' of ' + fmtSize(quota) + ' used'
     : fmtSize(total) + ' library';
 }
-
 async function checkPersist() {
   if (!navigator.storage || !navigator.storage.persisted) return;
   try {
@@ -1318,12 +1547,8 @@ async function checkPersist() {
       : 'Ask the browser to protect the library from cleanup.';
   } catch (e) {}
 }
-
 async function requestPersist() {
-  if (!navigator.storage || !navigator.storage.persist) {
-    toast('Persistent storage is not supported in this browser.');
-    return;
-  }
+  if (!navigator.storage || !navigator.storage.persist) { toast('Persistent storage is not supported in this browser.'); return; }
   let granted = false;
   try {
     if (navigator.storage.persisted) granted = await navigator.storage.persisted();
@@ -1334,7 +1559,6 @@ async function requestPersist() {
     : 'Not granted. The browser may clear the library under storage pressure.';
   toast(granted ? 'Persistent storage granted.' : 'Persistent storage was not granted.');
 }
-
 async function clearLibrary() {
   if (!state.tracks.length) { toast('The vault is already empty.'); return; }
   if (!confirm('Erase all ' + state.tracks.length + ' tracks from this browser? This cannot be undone.')) return;
@@ -1342,17 +1566,16 @@ async function clearLibrary() {
   audio.pause();
   try { audio.removeAttribute('src'); audio.load(); } catch (e) {}
   if (currentObjectURL) { try { URL.revokeObjectURL(currentObjectURL); } catch (e) {} currentObjectURL = null; }
+  if (state.currentArtURL) { try { URL.revokeObjectURL(state.currentArtURL); } catch (e) {} state.currentArtURL = null; }
 
-  try { await Promise.all([idbClear('meta'), idbClear('blobs'), idbClear('art')]); }
-  catch (e) { console.warn('Clear failed', e); }
+  try { await Promise.all([idbClear('meta'), idbClear('blobs'), idbClear('art')]); } catch (e) {}
 
   state.artUrls.forEach(u => { if (u) { try { URL.revokeObjectURL(u); } catch (e) {} } });
   state.artUrls.clear();
-  state.tracks = [];
-  state.view = [];
-  state.queue = [];
-  state.currentId = null;
+  state.tracks = []; state.view = []; state.queue = []; state.currentId = null;
 
+  setArtwork(null, null);
+  clearTheme();
   updateNowPlaying(null);
   setPlayIcon(false);
   setStatus('idle');
@@ -1369,47 +1592,21 @@ function showToast(text, pct) {
   if (typeof pct === 'number') {
     dom.toastBar.style.display = 'block';
     dom.toastFill.style.width = clamp(pct, 0, 100) + '%';
-  } else {
-    dom.toastBar.style.display = 'none';
-  }
+  } else dom.toastBar.style.display = 'none';
   dom.toast.classList.add('show');
   clearTimeout(toastTimer);
 }
-function hideToast(delay) {
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => dom.toast.classList.remove('show'), delay || 0);
-}
-function toast(text) {
-  showToast(text);
-  hideToast(2800);
-}
+function hideToast(delay) { clearTimeout(toastTimer); toastTimer = setTimeout(() => dom.toast.classList.remove('show'), delay || 0); }
+function toast(text) { showToast(text); hideToast(2800); }
 
 /* ============================================================
-   VAULT / SETTINGS OPEN-CLOSE
+   VAULT / SETTINGS
    ============================================================ */
-function openVault() {
-  dom.vault.classList.add('open');
-  dom.vault.setAttribute('aria-hidden', 'false');
-  $('#railLibrary').classList.add('on');
-  refresh();
-}
-function closeVault() {
-  dom.vault.classList.remove('open');
-  dom.vault.setAttribute('aria-hidden', 'true');
-}
-function openSettings() {
-  dom.settings.classList.add('open');
-  dom.settings.setAttribute('aria-hidden', 'false');
-  updateStorage();
-}
-function closeSettings() {
-  dom.settings.classList.remove('open');
-  dom.settings.setAttribute('aria-hidden', 'true');
-}
-function playFromLibrary(id) {
-  buildQueue(id);
-  playTrack(id, true);
-}
+function openVault() { dom.vault.classList.add('open'); dom.vault.setAttribute('aria-hidden', 'false'); $('#railLibrary').classList.add('on'); refresh(); }
+function closeVault() { dom.vault.classList.remove('open'); dom.vault.setAttribute('aria-hidden', 'true'); }
+function openSettings() { dom.settings.classList.add('open'); dom.settings.setAttribute('aria-hidden', 'false'); updateStorage(); }
+function closeSettings() { dom.settings.classList.remove('open'); dom.settings.setAttribute('aria-hidden', 'true'); }
+function playFromLibrary(id) { buildQueue(id); playTrack(id, true); }
 
 /* ============================================================
    WIRING
@@ -1418,25 +1615,22 @@ function bindUI() {
 
   /* --- transport --- */
   dom.dockPlay.addEventListener('click', () => {
+    ensureAudioGraph();
     if (!state.currentId) {
       const list = state.view.length ? state.view : state.tracks;
-      if (list.length) {
-        buildQueue();
-        playTrack(state.queue[0], true);
-      } else {
-        openVault();
-      }
+      if (list.length) { buildQueue(); playTrack(state.queue[0], true); }
+      else openVault();
       return;
     }
     if (audio.paused) audio.play().catch(() => {});
     else audio.pause();
   });
-
   dom.dockPrev.addEventListener('click', () => {
+    ensureAudioGraph();
     if (audio.currentTime > 3) { audio.currentTime = 0; return; }
     playNext(-1);
   });
-  dom.dockNext.addEventListener('click', () => playNext(1));
+  dom.dockNext.addEventListener('click', () => { ensureAudioGraph(); playNext(1); });
 
   /* --- seek --- */
   dom.seek.addEventListener('pointerdown', () => { scrubbing = true; });
@@ -1469,33 +1663,47 @@ function bindUI() {
   });
   $('#railImport').addEventListener('click', () => dom.fileInput.click());
   $('#railSettings').addEventListener('click', openSettings);
+
+  dom.railArt.addEventListener('click', () => {
+    settings.artVisible = !settings.artVisible;
+    saveSettings();
+    document.body.classList.toggle('art-visible', settings.artVisible);
+    paintSwitch($('#setArtVisible'), settings.artVisible);
+    dom.railArt.classList.toggle('on', settings.artVisible);
+    flashSaved();
+  });
+  dom.railTheme.addEventListener('click', () => {
+    settings.autoTheme = !settings.autoTheme;
+    saveSettings();
+    paintSwitch($('#setAutoTheme'), settings.autoTheme);
+    dom.railTheme.classList.toggle('on', settings.autoTheme);
+    if (settings.autoTheme && state.currentId) {
+      const t = state.tracks.find(x => x.id === state.currentId);
+      if (t) updateThemeForTrack(t, state.currentArtBlob);
+    } else {
+      clearTheme();
+    }
+    flashSaved();
+  });
+
   $('#railFocus').addEventListener('click', (e) => {
     e.stopPropagation();
     document.body.classList.add('cinema');
-    closeVault();
-    closeSettings();
+    closeVault(); closeSettings();
     setTimeout(() => {
-      const exit = () => {
-        document.body.classList.remove('cinema');
-        document.removeEventListener('pointerdown', exit);
-      };
+      const exit = () => { document.body.classList.remove('cinema'); document.removeEventListener('pointerdown', exit); };
       document.addEventListener('pointerdown', exit);
     }, 350);
   });
 
   dom.railShuffle.addEventListener('click', () => {
     settings.shuffle = !settings.shuffle;
-    saveSettings();
-    syncShuffleUI();
-    flashSaved();
+    saveSettings(); syncShuffleUI(); flashSaved();
   });
-
   dom.railRepeat.addEventListener('click', () => {
     const order = ['off', 'all', 'one'];
     settings.repeat = order[(order.indexOf(settings.repeat) + 1) % order.length];
-    saveSettings();
-    syncRepeatUI();
-    flashSaved();
+    saveSettings(); syncRepeatUI(); flashSaved();
     toast('Repeat: ' + settings.repeat);
   });
 
@@ -1505,11 +1713,7 @@ function bindUI() {
   $('#btnClear').addEventListener('click', clearLibrary);
   $('#btnPersist').addEventListener('click', requestPersist);
 
-  dom.search.addEventListener('input', () => {
-    state.query = dom.search.value;
-    refresh();
-  });
-
+  dom.search.addEventListener('input', () => { state.query = dom.search.value; refresh(); });
   dom.filters.addEventListener('click', e => {
     const btn = e.target.closest('button[data-filter]');
     if (!btn) return;
@@ -1517,7 +1721,6 @@ function bindUI() {
     state.filter = btn.dataset.filter;
     refresh();
   });
-
   dom.grid.addEventListener('click', e => {
     const card = e.target.closest('.card');
     if (!card) return;
@@ -1529,39 +1732,85 @@ function bindUI() {
       else removeTrack(id);
       return;
     }
+    ensureAudioGraph();
     playFromLibrary(id);
   });
 
   /* --- settings panel --- */
   $('#btnCloseSettings').addEventListener('click', closeSettings);
   $('#btnDoneSettings').addEventListener('click', closeSettings);
-  dom.settings.addEventListener('click', e => {
-    if (e.target === dom.settings) closeSettings();
-  });
+  dom.settings.addEventListener('click', e => { if (e.target === dom.settings) closeSettings(); });
 
   bindSwitch($('#setAutoplay'), 'autoplay');
   bindSwitch($('#setShuffle'), 'shuffle', syncShuffleUI);
-  bindSwitch($('#setScene'), 'scene', () => {
-    document.body.classList.toggle('no-scene', !settings.scene);
+  bindSwitch($('#setScene'), 'scene', () => { document.body.classList.toggle('no-scene', !settings.scene); });
+  bindSwitch($('#setCardHover'), 'cardHover', () => { document.body.classList.toggle('card-hover', !!settings.cardHover); });
+  bindSwitch($('#setReduceMotion'), 'reduceMotion', () => { document.body.classList.toggle('reduce-motion', !!settings.reduceMotion); });
+  bindSwitch($('#setContrast'), 'highContrast', () => { document.body.classList.toggle('high-contrast', !!settings.highContrast); });
+
+  bindSwitch($('#setEnhance'), 'enhance', () => {
+    ensureAudioGraph();
+    applyAudioEnhance();
   });
-  bindSwitch($('#setCardHover'), 'cardHover', () => {
-    document.body.classList.toggle('card-hover', !!settings.cardHover);
+  bindSwitch($('#setCompressor'), 'compressor', applyAudioEnhance);
+
+  bindSwitch($('#setArtVisible'), 'artVisible', () => {
+    document.body.classList.toggle('art-visible', settings.artVisible);
+    dom.railArt.classList.toggle('on', settings.artVisible);
   });
-  bindSwitch($('#setReduceMotion'), 'reduceMotion', () => {
-    document.body.classList.toggle('reduce-motion', !!settings.reduceMotion);
+
+  bindSwitch($('#setAutoTheme'), 'autoTheme', () => {
+    dom.railTheme.classList.toggle('on', settings.autoTheme);
+    if (settings.autoTheme && state.currentId) {
+      const t = state.tracks.find(x => x.id === state.currentId);
+      if (t) updateThemeForTrack(t, state.currentArtBlob);
+    } else clearTheme();
   });
-  bindSwitch($('#setContrast'), 'highContrast', () => {
-    document.body.classList.toggle('high-contrast', !!settings.highContrast);
+
+  bindSwitch($('#setPulse'), 'pulse', () => {
+    document.body.classList.toggle('pulse-on', settings.pulse);
+    if (settings.pulse) startPulseLoop();
   });
 
   $('#setRepeat').addEventListener('click', e => {
     const btn = e.target.closest('button[data-repeat]');
     if (!btn) return;
     settings.repeat = btn.dataset.repeat;
+    saveSettings(); syncRepeatUI(); flashSaved();
+  });
+
+  $('#setPreset').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-preset]');
+    if (!btn) return;
+    const p = btn.dataset.preset;
+    const preset = PRESETS[p] || PRESETS.flat;
+    settings.preset = p;
+    settings.bass = preset.bass;
+    settings.mid = preset.mid;
+    settings.treble = preset.treble;
     saveSettings();
-    syncRepeatUI();
+    syncEnhanceUI();
+    ensureAudioGraph();
+    applyAudioEnhance();
     flashSaved();
   });
+
+  const hookSlider = (id, key) => {
+    const el = $('#' + id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      settings[key] = parseFloat(el.value);
+      settings.preset = 'custom';
+      saveSettings();
+      syncEnhanceUI();
+      ensureAudioGraph();
+      applyAudioEnhance();
+    });
+    el.addEventListener('change', flashSaved);
+  };
+  hookSlider('setBass', 'bass');
+  hookSlider('setMid', 'mid');
+  hookSlider('setTreble', 'treble');
 
   const speed = $('#setSpeed');
   const speedVal = $('#setSpeedVal');
@@ -1579,12 +1828,7 @@ function bindUI() {
   $('#setPersist').addEventListener('click', requestPersist);
   $('#setClear').addEventListener('click', clearLibrary);
 
-  /* ----------------------------------------------------------
-     FILE INPUT — THE FIX
-     Copy the FileList into a real array first, THEN clear the
-     input. Clearing before copying empties the FileList in
-     Safari, iOS, and some Chromium builds.
-     ---------------------------------------------------------- */
+  /* --- file input --- */
   dom.fileInput.addEventListener('change', () => {
     const files = dom.fileInput.files;
     if (!files || !files.length) return;
@@ -1595,11 +1839,7 @@ function bindUI() {
 
   /* --- drag & drop --- */
   let dragDepth = 0;
-  window.addEventListener('dragenter', e => {
-    e.preventDefault();
-    dragDepth++;
-    dom.dropzone.classList.add('show');
-  });
+  window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; dom.dropzone.classList.add('show'); });
   window.addEventListener('dragover', e => e.preventDefault());
   window.addEventListener('dragleave', e => {
     e.preventDefault();
@@ -1611,8 +1851,7 @@ function bindUI() {
     dragDepth = 0;
     dom.dropzone.classList.remove('show');
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
-      const snapshot = toArray(e.dataTransfer.files);
-      importFiles(snapshot);
+      importFiles(toArray(e.dataTransfer.files));
     }
   });
 
@@ -1622,21 +1861,11 @@ function bindUI() {
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
     if (e.code === 'Space') {
       e.preventDefault();
-      if (state.currentId) {
-        if (audio.paused) audio.play().catch(() => {});
-        else audio.pause();
-      }
-    } else if (e.code === 'ArrowRight' && e.shiftKey) {
-      playNext(1);
-    } else if (e.code === 'ArrowLeft' && e.shiftKey) {
-      playNext(-1);
-    } else if (e.key === 'Escape') {
-      closeVault();
-      closeSettings();
-      document.body.classList.remove('cinema');
-    } else if (e.key === 'c' || e.key === 'C') {
-      document.body.classList.toggle('cinema');
-    }
+      if (state.currentId) { if (audio.paused) { ensureAudioGraph(); audio.play().catch(() => {}); } else audio.pause(); }
+    } else if (e.code === 'ArrowRight' && e.shiftKey) playNext(1);
+    else if (e.code === 'ArrowLeft' && e.shiftKey) playNext(-1);
+    else if (e.key === 'Escape') { closeVault(); closeSettings(); document.body.classList.remove('cinema'); }
+    else if (e.key === 'c' || e.key === 'C') document.body.classList.toggle('cinema');
   });
 
   /* --- media session --- */
@@ -1649,13 +1878,14 @@ function bindUI() {
     } catch (e) {}
   }
 
+  /* --- resume audio context when the page becomes visible again --- */
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) resumeAudioCtx();
+  });
+
   /* --- warn before leaving mid-import --- */
   window.addEventListener('beforeunload', e => {
-    if (state.importing) {
-      e.preventDefault();
-      e.returnValue = '';
-      return '';
-    }
+    if (state.importing) { e.preventDefault(); e.returnValue = ''; return ''; }
   });
 }
 
@@ -1664,21 +1894,17 @@ function bindUI() {
    ============================================================ */
 async function init() {
   applySettings();
+  dom.railArt.classList.toggle('on', settings.artVisible);
+  dom.railTheme.classList.toggle('on', settings.autoTheme);
 
   try {
     db = await openDB();
-    dbReady = true;
     state.tracks = await idbAll('meta');
-    // Sanitize any corrupt records
     state.tracks = state.tracks.filter(t => t && t.id && typeof t.id === 'string');
   } catch (e) {
     console.warn('[Resonance] IndexedDB unavailable:', e);
     db = null;
-    dbReady = false;
-    // Show a non-blocking warning
-    setTimeout(() => {
-      toast('Local storage unavailable — imports will not persist.');
-    }, 600);
+    setTimeout(() => toast('Local storage unavailable — imports will not persist.'), 600);
   }
 
   bindUI();
@@ -1688,13 +1914,13 @@ async function init() {
   setStatus('idle');
   setPlayIcon(false);
   updateNowPlaying(null);
+  setArtwork(null, null);
+  startPulseLoop(); // runs but idles when audio is paused
 }
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init, { once: true });
-} else {
-  init();
-}
+} else init();
 
 })();
 </script>
